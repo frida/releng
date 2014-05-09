@@ -1,0 +1,137 @@
+# config.site for configure
+
+frida_target=@frida_target@
+frida_prefix=@frida_prefix@
+
+test "$prefix" = NONE && prefix="$frida_prefix"
+
+enable_nls=no
+
+frida_warning_flags="-Wall"
+
+case "$PACKAGE_TARNAME" in
+  capstone)
+    # Takes ages to compile with debug information
+    frida_flags="-Os -pipe"
+  ;;
+  *)
+    frida_flags="-Os -pipe -gdwarf-2 -g3"
+  ;;
+esac
+
+case $frida_target in
+  linux-x86_32)
+    host_alias="i686-linux-gnu"
+    cross_compiling=yes
+  ;;
+  linux-x86_64)
+    host_alias="x86_64-linux-gnu"
+    cross_compiling=no
+  ;;
+  android-arm)
+    if [ -n "$FRIDA_LEGACY_AUTOTOOLS" ]; then
+      host_alias="armv7-linux-eabi"
+    else
+      host_alias="armv7-none-linux-androideabi"
+    fi
+    cross_compiling=yes
+
+    frida_flags="$frida_flags -mthumb"
+  ;;
+  mac32)
+    host_alias="i686-apple-darwin"
+    cross_compiling=yes
+  ;;
+  ios-arm)
+    host_alias="arm-apple-darwin"
+    cross_compiling=yes
+
+    frida_flags="$frida_flags -mthumb"
+  ;;
+  ios-arm64)
+    host_alias="aarch64-apple-darwin"
+    cross_compiling=yes
+  ;;
+esac
+
+# Work around a bug in stdint generation m4, where CFLAGS is overwritten,
+# causing this check to conclude that there's no stdint.h support...
+ac_cv_header_stdint_t=yes
+
+if [ -x /usr/bin/install ]; then
+  ac_cv_path_install="/usr/bin/install -p"
+fi
+
+case "$PACKAGE_TARNAME" in
+  'libffi')
+    CFLAGS="$CFLAGS -DFFI_MMAP_EXEC_WRIT=1 -DFFI_MMAP_EXEC_SELINUX=0"
+    enable_shared=no
+    enable_static=yes
+  ;;
+  'glib')
+    enable_dtrace=no
+    enable_tests=no
+
+    enable_shared=no
+    enable_static=yes
+
+    glib_cv_stack_grows=no
+    glib_cv_uscore=no
+
+    case $frida_target in
+      android-*)
+        ac_cv_func_posix_getgrgid_r=no
+        ac_cv_func_posix_getpwuid_r=no
+      ;;
+      *)
+        ac_cv_func_posix_getgrgid_r=yes
+        ac_cv_func_posix_getpwuid_r=yes
+      ;;
+    esac
+
+    case $frida_target in
+      linux-*)
+        glib_cv_have_qsort_r=yes
+      ;;
+      mac32|mac64|ios-*|android-*)
+        glib_cv_have_qsort_r=no
+      ;;
+    esac
+
+    case $frida_target in
+      linux-*|android-*|mac32|mac64|ios-*)
+        enable_proxy_libintl=yes
+      ;;
+    esac
+
+    CFLAGS="$CFLAGS -I$frida_prefix/include"
+    LDFLAGS="$LDFLAGS -L$frida_prefix/lib"
+  ;;
+  'libgee')
+    enable_shared=no
+    enable_static=yes
+
+    CFLAGS="$CFLAGS -Wno-error=implicit-function-declaration"
+  ;;
+  'vala'|'json-glib'|'udis86')
+    enable_shared=no
+    enable_static=yes
+  ;;
+  'capstone')
+    enable_shared=no
+    enable_static=yes
+    enable_maintainer_mode=yes
+    frida_flags="$frida_warning_flags $frida_flags"
+  ;;
+  frida-*)
+    enable_maintainer_mode=yes
+    frida_flags="$frida_warning_flags $frida_flags"
+  ;;
+  *)
+    frida_flags="$frida_warning_flags $frida_flags"
+  ;;
+esac
+
+CFLAGS="$CFLAGS $frida_flags"
+CXXFLAGS="$CXXFLAGS $frida_flags"
+OBJCFLAGS="$OBJCFLAGS $frida_flags"
