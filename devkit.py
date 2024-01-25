@@ -10,6 +10,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 
 if platform.system() == "Windows":
@@ -53,7 +54,11 @@ def main():
 
     outdir.mkdir(parents=True, exist_ok=True)
 
-    generate_devkit(kit, host, flavor, outdir)
+    try:
+        generate_devkit(kit, host, flavor, outdir)
+    except subprocess.CalledProcessError as e:
+        print(e, file=sys.stderr)
+        print("Output:", e.output)
 
 
 def generate_devkit(kit, host, flavor, output_dir):
