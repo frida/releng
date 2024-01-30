@@ -1055,7 +1055,7 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
     echo "lipo = [$raw_lipo]"
   fi
 
-  echo "pkgconfig = '$pkg_config_wrapper'"
+  echo "pkg_config = '$pkg_config_wrapper'"
   if [ -n "$qemu" ]; then
     echo "exe_wrapper = ['$qemu', '-L', '$FRIDA_QEMU_SYSROOT']"
   fi
