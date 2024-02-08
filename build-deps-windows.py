@@ -15,8 +15,17 @@ import time
 from typing import AbstractSet, Callable, Dict, List, Tuple
 import urllib.request
 
-from deps import read_dependency_parameters, Bundle, DependencyParameters, PackageSpec
-import winenv
+RELENG_DIR = Path(__file__).parent.resolve()
+ROOT_DIR = RELENG_DIR.parent
+
+if __name__ == "__main__":
+    # TODO: Refactor
+    sys.path.insert(0, str(ROOT_DIR))
+
+from releng.env import detect_native_machine
+from releng.deps import read_dependency_parameters, Bundle, DependencyParameters, PackageSpec
+from releng.machine_spec import MachineSpec
+from releng import winenv
 
 
 class PackageRole(Enum):
@@ -65,8 +74,6 @@ RUNTIMES = {
 }
 COMPRESSION_LEVEL = 9
 
-RELENG_DIR = Path(__file__).parent.resolve()
-ROOT_DIR = RELENG_DIR.parent
 DEPS_DIR = ROOT_DIR / "deps"
 BOOTSTRAP_TOOLCHAIN_DIR = ROOT_DIR / "build" / "fts-toolchain-windows"
 
@@ -147,7 +154,7 @@ cached_meson_params = {}
 cached_target_glib = None
 cached_bootstrap_valac = None
 
-build_arch = 'x86_64' if platform.machine().endswith("64") else 'x86'
+native_machine = detect_native_machine()
 
 
 def main():
@@ -246,8 +253,8 @@ def synchronize(packages: List[Package], params: DependencyParameters):
 
 def check_environment():
     try:
-        winenv.get_msvs_installation_dir()
-        winenv.get_windows_sdk()
+        winenv.detect_msvs_installation_dir()
+        winenv.detect_windows_sdk()
     except winenv.MissingDependencyError as e:
         print("ERROR: {}".format(e), file=sys.stderr)
         sys.exit(1)
@@ -391,30 +398,10 @@ def generate_meson_env(arch: str, config: str, runtime: str) -> MesonEnv:
     env_dir = get_tmp_path(arch, config, runtime)
     env_dir.mkdir(parents=True, exist_ok=True)
 
-    vc_dir = winenv.get_msvs_installation_dir() / "VC"
-    vc_install_dir = str(vc_dir) + "\\"
+    vc_dir = winenv.detect_msvs_installation_dir() / "VC"
+    vc_installdir = str(vc_dir) + "\\"
 
     msvc_platform = winenv.msvc_platform_from_arch(arch)
-    msvc_dir = winenv.get_msvc_tool_dir()
-    msvc_bin_dir = msvc_dir / "bin" / ("Host" + winenv.msvc_platform_from_arch(build_arch)) / msvc_platform
-
-    msvc_dll_dirs = []
-    if arch != build_arch:
-        build_msvc_platform = winenv.msvc_platform_from_arch(build_arch)
-        msvc_dll_dirs.append(msvc_dir / "bin" / ("Host" + build_msvc_platform) / build_msvc_platform)
-
-    (win_sdk_dir, win_sdk_version) = winenv.get_windows_sdk()
-
-    target_sdk_bin_dir = win_sdk_dir / "Bin" / win_sdk_version / msvc_platform
-    target_sdk_lib_dir = win_sdk_dir / "Lib" / win_sdk_version / "um" / msvc_platform
-    target_sdk_inc_dirs = [
-        win_sdk_dir / "Include" / win_sdk_version / "um",
-        win_sdk_dir / "Include" / win_sdk_version / "shared",
-    ]
-    target_sdk_cxxflags = [
-        # Relax C++11 compliance for XP compatibility.
-        "/Zc:threadSafeInit-",
-    ]
 
     clflags = "/D" + " /D".join([
       "_UNICODE",
@@ -427,33 +414,28 @@ def generate_meson_env(arch: str, config: str, runtime: str) -> MesonEnv:
 
     cflags = " ".join(platform_cflags)
 
-    cxxflags = " ".join(platform_cflags + target_sdk_cxxflags)
+    cxxflags = " ".join(platform_cflags + [
+        # Relax C++11 compliance for XP compatibility.
+        "/Zc:threadSafeInit-",
+    ])
+
+    (winsdk_dir, winsdk_version) = winenv.detect_windows_sdk()
+    winsdk_bindir = winsdk_dir / "Bin" / winsdk_version / msvc_platform
 
     m4_path = BOOTSTRAP_TOOLCHAIN_DIR / "bin" / "m4.exe"
     bison_pkgdatadir = BOOTSTRAP_TOOLCHAIN_DIR / "share" / "bison"
+
+    machine = MachineSpec("windows", arch, config.lower())
 
     exe_path = ";".join([str(path) for path in [
         prefix / "bin",
         env_dir,
         BOOTSTRAP_TOOLCHAIN_DIR / "bin",
-        target_sdk_bin_dir,
-        msvc_bin_dir,
-    ] + msvc_dll_dirs])
+    ] + winenv.detect_msvs_runtime_path(machine, native_machine)])
 
-    include_path = ";".join([str(path) for path in [
-        msvc_dir / "include",
-        msvc_dir / "atlmfc" / "include",
-        vc_dir / "Auxiliary" / "VS" / "include",
-        win_sdk_dir / "Include" / win_sdk_version / "ucrt",
-    ] + target_sdk_inc_dirs])
+    include_path = ";".join([str(path) for path in winenv.detect_msvs_include_path()])
 
-    library_path = ";".join([str(path) for path in [
-        msvc_dir / "lib" / msvc_platform,
-        msvc_dir / "atlmfc" / "lib" / msvc_platform,
-        vc_dir / "Auxiliary" / "VS" / "lib" / msvc_platform,
-        win_sdk_dir / "Lib" / win_sdk_version / "ucrt" / msvc_platform,
-        target_sdk_lib_dir,
-    ]])
+    library_path = ";".join([str(path) for path in winenv.detect_msvs_library_path(machine)])
 
     env_path = env_dir / "env.bat"
     env_path.write_text("""@ECHO OFF
@@ -463,7 +445,7 @@ set LIB={library_path}
 set CL={clflags}
 set CFLAGS={cflags}
 set CXXFLAGS={cxxflags}
-set VCINSTALLDIR={vc_install_dir}
+set VCINSTALLDIR={vc_installdir}
 set Platform={platform}
 set VALA={valac}
 """.format(
@@ -473,13 +455,13 @@ set VALA={valac}
             clflags=clflags,
             cflags=cflags,
             cxxflags=cxxflags,
-            vc_install_dir=vc_install_dir,
+            vc_installdir=vc_installdir,
             platform=msvc_platform,
             valac=detect_bootstrap_valac(),
         ),
         encoding='utf-8')
 
-    rc_path = target_sdk_bin_dir / "rc.exe"
+    rc_path = winsdk_bindir / "rc.exe"
     rc_wrapper_path = env_dir / "rc.bat"
     rc_wrapper_path.write_text("""@ECHO OFF
 SETLOCAL EnableExtensions
@@ -558,7 +540,7 @@ sys.exit(subprocess.call([r"{bison_path}"] + args))
     shell_env["CL"] = clflags
     shell_env["CFLAGS"] = cflags
     shell_env["CXXFLAGS"] = cxxflags
-    shell_env["VCINSTALLDIR"] = vc_install_dir
+    shell_env["VCINSTALLDIR"] = vc_installdir
     shell_env["Platform"] = msvc_platform
     shell_env["VALAC"] = detect_bootstrap_valac()
 

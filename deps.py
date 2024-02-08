@@ -11,19 +11,25 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from typing import Dict, List, Tuple
 import urllib.request
-if platform.system() == 'Windows':
-    import winenv
+
+RELENG_DIR = Path(__file__).parent.resolve()
+ROOT_DIR = RELENG_DIR.parent
+
+if __name__ == "__main__":
+    # TODO: Refactor
+    sys.path.insert(0, str(ROOT_DIR))
+
+from releng import machine_spec, winenv
 
 
 BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
 
-RELENG_DIR = Path(__file__).parent.resolve()
 DEPS_MK_PATH = RELENG_DIR / "deps.mk"
-ROOT_DIR = RELENG_DIR.parent
 BUILD_DIR = ROOT_DIR / "build"
 
 CONFIG_KEY_VALUE_PATTERN = re.compile(r"^([a-z]\w+) = (.*?)(?<!\\)$", re.MULTILINE | re.DOTALL)
@@ -33,6 +39,10 @@ CONFIG_VARIABLE_REF_PATTERN = re.compile(r"\$\((\w+)\)")
 class Bundle(Enum):
     TOOLCHAIN = 1,
     SDK = 2,
+
+
+class BundleNotFoundError(Exception):
+    pass
 
 
 @dataclass
@@ -71,18 +81,18 @@ def main():
     command.add_argument("bundle", help="bundle to synchronize", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
     command.add_argument("location", help="filesystem location")
-    command.set_defaults(func=lambda args: sync(Bundle[args.bundle.upper()], args.host.lower(), Path(args.location).resolve()))
+    command.set_defaults(func=lambda args: sync(Bundle[args.bundle.upper()], machine_spec.parse(args.host), Path(args.location).resolve()))
 
     command = subparsers.add_parser("roll", help="build and upload prebuilt dependencies if needed")
     command.add_argument("bundle", help="bundle to roll", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
     command.add_argument("--activate", default=False, action='store_true')
-    command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], args.host.lower(), args.activate))
+    command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], machine_spec.parse(args.host), args.activate))
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", help="bundle to wait for", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
-    command.set_defaults(func=lambda args: wait(Bundle[args.bundle.upper()], args.host.lower()))
+    command.set_defaults(func=lambda args: wait(Bundle[args.bundle.upper()], machine_spec.parse(args.host)))
 
     command = subparsers.add_parser("bump", help="bump dependency versions")
     command.set_defaults(func=lambda args: bump())
@@ -99,23 +109,19 @@ def main():
         sys.exit(1)
 
 
-def sync(bundle: Bundle, host: str, location: Path):
+def sync(bundle: Bundle, machine: machine_spec.MachineSpec, location: Path):
     params = read_dependency_parameters()
     version = params.deps_version
 
     bundle_nick = bundle.name.lower() if bundle != Bundle.SDK else bundle.name
 
-    # XXX: This is Windows-only for now, as we use setup-env.sh to do the heavy lifting on other platforms.
-    tokens = host.split("-")
-    if len(tokens) == 2:
-        tokens += ["release"]
-    host_os, host_arch, host_config = tokens
-    assert host_os == "windows"
-
     if bundle == Bundle.SDK:
-        msvs_platform = winenv.msvs_platform_from_arch(host_arch)
-        subdir_name = f"{msvs_platform}-{host_config.title()}"
-        location = location / subdir_name
+        if machine.os == "windows":
+            msvs_platform = winenv.msvs_platform_from_arch(machine.arch)
+            subdir_name = f"{msvs_platform}-{machine.config.title()}"
+            location = location / subdir_name
+        else:
+            subdir_name = machine.identifier
 
     if location.exists():
         try:
@@ -126,7 +132,7 @@ def sync(bundle: Bundle, host: str, location: Path):
             pass
         shutil.rmtree(location)
 
-    (url, filename, suffix) = compute_bundle_parameters(bundle, host, version)
+    (url, filename, suffix) = compute_bundle_parameters(bundle, machine, version)
 
     local_bundle = location.parent / filename
     if local_bundle.exists():
@@ -138,42 +144,79 @@ def sync(bundle: Bundle, host: str, location: Path):
             print(f"Downloading SDK {version} for {subdir_name}...", flush=True)
         else:
             print(f"Downloading {bundle_nick} {version}...", flush=True)
-        with urllib.request.urlopen(url) as response, tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as archive:
-            shutil.copyfileobj(response, archive)
-            archive_path = Path(archive.name)
-            archive_is_temporary = True
-        print(f"Extracting {bundle_nick}...", flush=True)
+        try:
+            with urllib.request.urlopen(url) as response, \
+                    tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as archive:
+                shutil.copyfileobj(response, archive)
+                archive_path = Path(archive.name)
+                archive_is_temporary = True
+            print(f"Extracting {bundle_nick}...", flush=True)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                raise BundleNotFoundError(f"missing bundle at {url}") from e
+            raise e
 
     try:
-        if bundle == Bundle.SDK:
-            target_dir = location / "tmp"
+        staging_dir = location.parent / f"_{location.name}"
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+        staging_dir.mkdir(parents=True)
+
+        if machine.os == "windows":
+            subprocess.run([
+                archive_path,
+                "-o" + str(staging_dir),
+                "-y"
+            ], capture_output=True, check=True)
         else:
-            target_dir = location.parent
+            with tarfile.open(archive_path, "r:bz2") as tar:
+                tar.extractall(staging_dir)
 
-        subprocess.run([
-            archive_path,
-            "-o" + str(target_dir),
-            "-y"
-        ], capture_output=True, check=True)
+        root_items = list(staging_dir.iterdir())
+        temp_item = None
+        if len(root_items) == 1:
+            item = root_items[0]
+            root_items = list(item.iterdir())
+            temp_item = item
 
-        if bundle == Bundle.SDK:
-            shutil.move(target_dir / "sdk-windows" / "VERSION.txt", location / "VERSION.txt")
-            for file in (target_dir / "sdk-windows" / subdir_name).iterdir():
-                shutil.move(file, location)
-            shutil.rmtree(target_dir)
+        if machine.os == "windows" and bundle == Bundle.SDK:
+            assert len(root_items) == 2
+            version_txt = next(item for item in root_items if item.name == "VERSION.txt")
+            content_dir = next(item for item in root_items if item != version_txt)
+
+            shutil.move(version_txt, staging_dir / version_txt.name)
+            for item in content_dir.iterdir():
+                shutil.move(item, staging_dir / item.name)
+        elif temp_item is not None:
+            for item in root_items:
+                item.rename(staging_dir / item.name)
+
+        if temp_item is not None:
+            shutil.rmtree(temp_item)
+
+        if bundle == Bundle.TOOLCHAIN:
+            suffix_len = len(".frida.in")
+            raw_location = location.as_posix()
+            for f in staging_dir.rglob("*.frida.in"):
+                target = f.parent / f.name[:-suffix_len]
+                f.write_text(f.read_text(encoding="utf-8").replace("@FRIDA_TOOLROOT@", raw_location),
+                             encoding="utf-8")
+                f.rename(target)
+
+        staging_dir.rename(location)
     finally:
         if archive_is_temporary:
             archive_path.unlink()
 
 
-def roll(bundle: Bundle, host: str, activate: bool):
+def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool):
     params = read_dependency_parameters()
     version = params.deps_version
 
     if activate and bundle == Bundle.SDK:
         configure_bootstrap_version(version)
 
-    (public_url, filename, suffix) = compute_bundle_parameters(bundle, host, version)
+    (public_url, filename, suffix) = compute_bundle_parameters(bundle, machine, version)
 
     # First do a quick check to avoid hitting S3 in most cases.
     request = urllib.request.Request(public_url)
@@ -198,11 +241,11 @@ def roll(bundle: Bundle, host: str, activate: bool):
     if artifact.exists():
         artifact.unlink()
 
-    if host.startswith("windows-"):
+    if machine.os == "windows":
         subprocess.run([
                            sys.executable, RELENG_DIR / "build-deps-windows.py",
                            "--bundle=" + bundle.name.lower(),
-                           "--host=" + host,
+                           "--host=" + machine.identifier,
                        ],
                        check=True)
     else:
@@ -214,7 +257,7 @@ def roll(bundle: Bundle, host: str, activate: bool):
                            gnu_make,
                            "-C", ROOT_DIR,
                            "-f", "Makefile.{}.mk".format(bundle.name.lower()),
-                           "FRIDA_HOST=" + host,
+                           "FRIDA_HOST=" + machine.identifier,
                        ],
                        check=True)
 
@@ -227,9 +270,9 @@ def roll(bundle: Bundle, host: str, activate: bool):
         configure_bootstrap_version(version)
 
 
-def wait(bundle: Bundle, host: str):
+def wait(bundle: Bundle, machine: machine_spec.MachineSpec):
     params = read_dependency_parameters()
-    (url, filename, suffix) = compute_bundle_parameters(bundle, host, params.deps_version)
+    (url, filename, suffix) = compute_bundle_parameters(bundle, machine, params.deps_version)
 
     request = urllib.request.Request(url)
     request.get_method = lambda: "HEAD"
@@ -289,9 +332,13 @@ def bump():
         print("")
 
 
-def compute_bundle_parameters(bundle: Bundle, host: str, version: str) -> Tuple[str, str, str]:
-    suffix = ".exe" if host.startswith("windows-") else ".tar.bz2"
-    filename = "{}-{}{}".format(bundle.name.lower(), host, suffix)
+def compute_bundle_parameters(bundle: Bundle, machine: machine_spec.MachineSpec, version: str) -> Tuple[str, str, str]:
+    if bundle == Bundle.TOOLCHAIN and machine.os == "windows":
+        os_arch_config = "windows-x86"
+    else:
+        os_arch_config = machine.identifier
+    suffix = ".exe" if machine.os == "windows" else ".tar.bz2"
+    filename = "{}-{}{}".format(bundle.name.lower(), os_arch_config, suffix)
     url = BUNDLE_URL.format(version=version, filename=filename)
     return (url, filename, suffix)
 

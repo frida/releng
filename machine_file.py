@@ -75,8 +75,9 @@ def load(mfile: Path) -> Dict[str, Union[str, List[str]]]:
     }
 
     items = {}
-    for name, raw_value in config.items("constants"):
-        items[name] = eval(raw_value, hidden_constants, items)
+    if config.has_section("constants"):
+        for name, raw_value in config.items("constants"):
+            items[name] = eval(raw_value, hidden_constants, items)
 
     for section_name, section in config.items():
         if section_name in ("DEFAULT", "constants"):
@@ -87,7 +88,18 @@ def load(mfile: Path) -> Dict[str, Union[str, List[str]]]:
                 value = [value]
             items[name] = value
 
+    if len(items) == 0:
+        return None
+
     return items
+
+
+def strv_to_meson(strv):
+    return "[" + ", ".join(map(str_to_meson, strv)) + "]"
+
+
+def str_to_meson(s):
+    return "'" + s + "'"
 
 
 if __name__ == "__main__":
