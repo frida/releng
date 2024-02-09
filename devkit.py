@@ -145,8 +145,8 @@ class CompilerApplication:
                 capture_output=True,
                 encoding="utf-8",
                 check=True).stdout
-            header_lines = header_dependencies.strip().split("\n")[1:]
-            header_files = [Path(line.rstrip("\\").strip()) for line in header_lines]
+            _, raw_header_files = header_dependencies.split(": ", maxsplit=1)
+            header_files = [Path(item) for item in shlex.split(raw_header_files) if item != "\n"]
             header_files = [h for h in header_files if h.is_relative_to(REPO_ROOT)]
 
         devkit_header_lines = []
