@@ -219,6 +219,7 @@ if ! grep -Eq "^$toolchain_version\$" "$FRIDA_TOOLROOT/VERSION.txt" 2>/dev/null;
       -e "s,@FRIDA_TOOLROOT@,$FRIDA_TOOLROOT,g" \
       -e "s,@FRIDA_RELENG@,$FRIDA_RELENG,g" \
       "$template" > "$target"
+    rm "$template"
   done
 fi
 
@@ -255,6 +256,7 @@ if [ "$FRIDA_ENV_SDK" != 'none' ] && ! grep -Eq "^$sdk_version\$" "$FRIDA_SDKROO
       -e "s,@FRIDA_SDKROOT@,$FRIDA_SDKROOT,g" \
       -e "s,@FRIDA_RELENG@,$FRIDA_RELENG,g" \
       "$template" > "$target"
+    rm "$template"
   done
 fi
 
