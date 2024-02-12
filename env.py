@@ -217,10 +217,9 @@ def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
 
 
 def query_sdk_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    sdk_id = machine.identifier
     if machine.os == "windows":
         return deps_dir / "sdk-windows" / f"{machine.msvs_platform}-{machine.config.title()}"
-    return deps_dir / f"sdk-{sdk_id}"
+    return deps_dir / f"sdk-{machine.identifier}"
 
 
 def ensure_sdk(machine: MachineSpec, deps_dir: Path) -> Path:
