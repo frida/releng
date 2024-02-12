@@ -1024,6 +1024,10 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
     [ -n "$objc" ] && echo "objc_ld = '$linker_flavor'"
     [ -n "$objcxx" ] && echo "objcpp_ld = '$linker_flavor'"
   fi
+  for tool in gdbus-codegen gio-querymodules glib-compile-resources \
+              glib-compile-schemas glib-genmarshal glib-mkenums; do
+    echo "$tool = ['$FRIDA_TOOLROOT/bin/$tool']"
+  done
   echo "vala = [$raw_valac]"
 
   echo "ar = [$raw_ar]"
