@@ -207,7 +207,7 @@ def generate_machine_config(machine: MachineSpec,
 
 
 def query_toolchain_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    return deps_dir / f"toolchain-{machine.os}"
+    return deps_dir / f"toolchain-{machine.identifier}"
 
 
 def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
