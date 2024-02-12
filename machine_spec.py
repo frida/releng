@@ -176,6 +176,8 @@ def parse(raw_spec):
                     arch = "armhf"
                 elif os == "qnx" and system.endswith("eabi"):
                     arch = "armeabi"
+            elif arch == "aarch64":
+                arch = "arm64"
 
             config = None
             if system.startswith("musl"):
