@@ -12,7 +12,7 @@ from typing import Optional, Mapping, Sequence, Union
 from xml.etree import ElementTree
 from xml.etree.ElementTree import QName
 
-from . import winenv
+from . import env, winenv
 from .machine_spec import MachineSpec
 
 
@@ -45,6 +45,7 @@ class CompilerApplication:
         self.compiler_argument_syntax = None
         self.output_dir = output_dir
         self.library_filename = None
+        self.msvc_env = None
 
     def run(self):
         output_dir = self.output_dir
@@ -52,6 +53,11 @@ class CompilerApplication:
 
         self.compiler_argument_syntax = detect_compiler_argument_syntax(self.meson_config)
         self.library_filename = compute_library_filename(self.kit, self.compiler_argument_syntax)
+        if self.compiler_argument_syntax == "msvc" and self.meson_config is None:
+            menv = {**os.environ}
+            runtime_dirs = [str(d) for d in winenv.detect_msvs_runtime_path(self.machine, env.detect_native_machine())]
+            menv["PATH"] = os.pathsep.join(runtime_dirs) + os.pathsep + menv["PATH"]
+            self.msvc_env = menv
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -97,7 +103,7 @@ class CompilerApplication:
 
         gir_name = "frida-core.gir"
 
-        shutil.copy(str(gir_path), str(output_dir / gir_name))
+        shutil.copy(str(gir_path), str(self.output_dir / gir_name))
 
         return [gir_name]
 
@@ -117,15 +123,11 @@ class CompilerApplication:
         if self.compiler_argument_syntax == "msvc":
             if meson_config is not None:
                 cl_cmd = meson_config["c"]
-                cl_args = []
-                work_dir = None
             else:
                 cl_cmd = [winenv.detect_msvs_tool_path(machine, "cl.exe")]
-                cl_args = winenv.detect_msvs_cflags()
-                work_dir = winenv.detect_msvs_runtime_path(machine)
 
-            preprocessor = subprocess.run(cl_cmd + c_args + ["/nologo", "/E", umbrella_header_path] + include_cflags + cl_args,
-                                          cwd=work_dir,
+            preprocessor = subprocess.run(cl_cmd + c_args + ["/nologo", "/E", umbrella_header_path] + include_cflags,
+                                          env=self.msvc_env,
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.PIPE,
                                           encoding="utf-8")
@@ -225,15 +227,13 @@ class CompilerApplication:
         meson_config = self.meson_config
 
         lib_cmd = None
-        work_dir = None
         if meson_config is not None:
             lib_cmd = meson_config.get("lib", None)
         if lib_cmd is None:
             lib_cmd = [winenv.detect_msvs_tool_path(machine, "lib.exe")]
-            work_dir = winenv.detect_msvs_runtime_path(machine)
 
         subprocess.run(lib_cmd + ["/nologo", "/out:" + str(self.output_dir / self.library_filename)] + library_paths,
-                       cwd=work_dir,
+                       env=self.msvc_env,
                        capture_output=True,
                        encoding="utf-8",
                        check=True)
@@ -630,9 +630,9 @@ def compute_custom_include_cflags(machine):
         REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "include" / "json-glib-1.0",
         REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "lib" / "glib-2.0" / "include",
         REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "include" / "glib-2.0",
-    ]
+    ] + winenv.detect_msvs_include_path()
 
-    return ["/I" + str(incdir) for incdir in incdirs] + winenv.detect_msvs_cflags()
+    return ["/I" + str(incdir) for incdir in incdirs]
 
 
 def compute_custom_library_paths_and_flags(package, machine):
