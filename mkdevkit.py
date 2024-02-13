@@ -63,6 +63,7 @@ def main():
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
         print("Output:", e.output, file=sys.stderr)
+        sys.exit(1)
 
 
 def parse_array_option_value(raw_array):
