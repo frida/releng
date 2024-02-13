@@ -99,7 +99,7 @@ class CompilerApplication:
         if self.compiler_argument_syntax == "msvc":
             gir_path = REPO_ROOT / "build" / f"tmp{flavor}-windows" / msvs_arch_config(machine) / "frida-core" / "Frida-1.0.gir"
         else:
-            gir_path = REPO_ROOT / "build" / f"tmp{flavor}-{machine}" / "frida-core" / "src" / "Frida-1.0.gir"
+            gir_path = REPO_ROOT / "build" / f"tmp{flavor}-{machine.identifier}" / "frida-core" / "src" / "Frida-1.0.gir"
 
         gir_name = "frida-core.gir"
 
