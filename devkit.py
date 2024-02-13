@@ -468,7 +468,7 @@ def call_pkgconfig(argv, meson_config):
         **os.environ,
         "PKG_CONFIG_PATH": os.pathsep.join(meson_config.get("pkg_config_path", [])),
     }
-    return subprocess.run(meson_config.get("pkg_config", ["pkg-config"]) + argv,
+    return subprocess.run(meson_config.get("pkg-config", ["pkg-config"]) + argv,
                           capture_output=True,
                           encoding="utf-8",
                           check=True,
