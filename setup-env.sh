@@ -879,7 +879,14 @@ if [ "$FRIDA_ENV_SDK" != 'none' ]; then
 fi
 valac+=("--vapidir=$FRIDA_TOOLROOT/share/vala-$vala_api_version/vapi")
 
-pkg_config_wrapper=$FRIDA_BUILD/${FRIDA_ENV_NAME:-frida}-${host_machine}-pkg-config
+pkg_config=("$FRIDA_TOOLROOT/bin/pkg-config")
+if [ "$FRIDA_ENV_NAME" != 'frida_gir' ]; then
+  pkg_config+=("--static")
+fi
+if [ "$FRIDA_ENV_SDK" != 'none' ]; then
+  pkg_config+=("--define-variable=frida_sdk_prefix=$FRIDA_SDKROOT")
+fi
+
 case $host_os in
   freebsd)
     libdatadir=libdata
@@ -888,23 +895,13 @@ case $host_os in
     libdatadir=lib
     ;;
 esac
-pkg_config="$FRIDA_TOOLROOT/bin/pkg-config"
-pkg_config_flags="--static"
 pkg_config_path="$FRIDA_PREFIX/$libdatadir/pkgconfig"
 if [ "$FRIDA_ENV_NAME" == 'frida_gir' ]; then
-  pkg_config_path="$(pkg-config --variable pc_path pkg-config):$pkg_config_path"
-  pkg_config_flags=""
+  pkg_config_path="$pkg_config_path:$(pkg-config --variable pc_path pkg-config)"
 fi
 if [ "$FRIDA_ENV_SDK" != 'none' ]; then
-  pkg_config_flags=" $pkg_config_flags --define-variable=frida_sdk_prefix=$FRIDA_SDKROOT"
   pkg_config_path="$pkg_config_path:$FRIDA_SDKROOT/$libdatadir/pkgconfig"
 fi
-(
-  echo "#!/bin/sh"
-  echo "export PKG_CONFIG_PATH=\"$pkg_config_path\""
-  echo "exec \"$pkg_config\" $pkg_config_flags \"\$@\""
-) > "$pkg_config_wrapper"
-chmod 755 "$pkg_config_wrapper"
 
 env_rc=${FRIDA_BUILD}/${FRIDA_ENV_NAME:-frida}-env-${host_machine}.rc
 
@@ -978,6 +975,7 @@ array_to_args raw_cxx "${cxx[@]}"
 array_to_args raw_objc "${objc[@]}"
 array_to_args raw_objcxx "${objcxx[@]}"
 array_to_args raw_valac "${valac[@]}"
+array_to_args raw_pkg_config "${pkg_config[@]}"
 
 array_to_args raw_ar "${ar[@]}"
 array_to_args raw_nm "${nm[@]}"
@@ -1029,6 +1027,7 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
     echo "$tool = ['$FRIDA_TOOLROOT/bin/$tool']"
   done
   echo "vala = [$raw_valac]"
+  echo "pkg-config = [$raw_pkg_config]"
 
   echo "ar = [$raw_ar]"
   echo "nm = [$raw_nm]"
@@ -1061,7 +1060,6 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
     echo "lipo = [$raw_lipo]"
   fi
 
-  echo "pkg-config = '$pkg_config_wrapper'"
   if [ -n "$qemu" ]; then
     echo "exe_wrapper = ['$qemu', '-L', '$FRIDA_QEMU_SYSROOT']"
   fi
@@ -1083,6 +1081,7 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
   if [ -n "$objcxx" ]; then
     echo "objcpp_link_args = linker_flags + cxx_link_flags"
   fi
+  echo "pkg_config_path = '$pkg_config_path'"
   echo "b_lundef = $b_lundef"
   if [ $enable_asan = yes ]; then
     echo "b_sanitize = 'address'"
