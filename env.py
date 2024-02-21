@@ -198,7 +198,7 @@ def generate_machine_config(machine: MachineSpec,
     if sdk_prefix is not None:
         libdatadir = "libdata" if machine.os == "freebsd" else "lib"
         pkg_config_path = [str(sdk_prefix / libdatadir / "pkgconfig")]
-        config["built-in options"]["pkg_config_path"] = str_to_meson(os.pathsep.join(pkg_config_path))
+        config["built-in options"]["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
     sink = io.StringIO()
     config.write(sink)

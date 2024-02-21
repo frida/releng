@@ -895,12 +895,13 @@ case $host_os in
     libdatadir=lib
     ;;
 esac
-pkg_config_path="$FRIDA_PREFIX/$libdatadir/pkgconfig"
+pkg_config_path=("$FRIDA_PREFIX/$libdatadir/pkgconfig")
 if [ "$FRIDA_ENV_NAME" == 'frida_gir' ]; then
-  pkg_config_path="$pkg_config_path:$(pkg-config --variable pc_path pkg-config)"
+  IFS=':' read -ra system_pkg_path <<< $(pkg-config --variable pc_path pkg-config)
+  pkg_config_path+=("${system_pkg_path[@]}")
 fi
 if [ "$FRIDA_ENV_SDK" != 'none' ]; then
-  pkg_config_path="$pkg_config_path:$FRIDA_SDKROOT/$libdatadir/pkgconfig"
+  pkg_config_path+=("$FRIDA_SDKROOT/$libdatadir/pkgconfig")
 fi
 
 env_rc=${FRIDA_BUILD}/${FRIDA_ENV_NAME:-frida}-env-${host_machine}.rc
@@ -976,6 +977,7 @@ array_to_args raw_objc "${objc[@]}"
 array_to_args raw_objcxx "${objcxx[@]}"
 array_to_args raw_valac "${valac[@]}"
 array_to_args raw_pkg_config "${pkg_config[@]}"
+array_to_args raw_pkg_config_path "${pkg_config_path[@]}"
 
 array_to_args raw_ar "${ar[@]}"
 array_to_args raw_nm "${nm[@]}"
@@ -1081,7 +1083,7 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
   if [ -n "$objcxx" ]; then
     echo "objcpp_link_args = linker_flags + cxx_link_flags"
   fi
-  echo "pkg_config_path = '$pkg_config_path'"
+  echo "pkg_config_path = [$raw_pkg_config_path]"
   echo "b_lundef = $b_lundef"
   if [ $enable_asan = yes ]; then
     echo "b_sanitize = 'address'"
