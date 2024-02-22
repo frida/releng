@@ -185,15 +185,13 @@ def generate_machine_config(machine: MachineSpec,
         vala_api_version = valac_datadir.name.split("-", maxsplit=1)[1]
         binaries["vala"] = strv_to_meson([
             str(toolchain_bindir / f"valac-{vala_api_version}{exe_suffix}"),
+            "--vapidir=" + str(valac_datadir / "vapi"),
         ])
 
-        vapi_dirs = []
         if sdk_prefix is not None:
-            vapi_dirs += [sdk_prefix / "share" / "vala" / "vapi"]
-        vapi_dirs += [valac_datadir / "vapi"]
-        config["built-in options"]["vala_args"] = strv_to_meson(
-            [f"--vapidir={d}" for d in vapi_dirs]
-        )
+            config["built-in options"]["vala_args"] = strv_to_meson([
+                "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
+            ])
 
     if sdk_prefix is not None:
         libdatadir = "libdata" if machine.os == "freebsd" else "lib"

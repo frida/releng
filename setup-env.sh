@@ -873,11 +873,11 @@ fi
 
 vala_api_version=$(ls -1 "$FRIDA_TOOLROOT/share" | grep "vala-" | cut -f2 -d"-")
 valac=("$FRIDA_TOOLROOT/bin/valac-$vala_api_version")
+valac+=("--vapidir=$FRIDA_TOOLROOT/share/vala-$vala_api_version/vapi")
 vala_args=("--vapidir=$FRIDA_PREFIX/share/vala/vapi")
 if [ "$FRIDA_ENV_SDK" != 'none' ]; then
   vala_args+=("--vapidir=$FRIDA_SDKROOT/share/vala/vapi")
 fi
-vala_args+=("--vapidir=$FRIDA_TOOLROOT/share/vala-$vala_api_version/vapi")
 
 pkg_config=("$FRIDA_TOOLROOT/bin/pkg-config")
 if [ "$FRIDA_ENV_NAME" != 'frida_gir' ]; then
