@@ -175,7 +175,7 @@ pkg_config_deps_for_build = \
 	$(NULL)
 
 vala_name = Vala
-vala_version = 24fa9aa10c9da4f82b67885e760ec0f2fbbdb991
+vala_version = fd27a2f06f757dbdf155a6a998aea25023e5fbfd
 vala_url = $(frida_base_url)/vala.git
 vala_recipe = meson
 vala_patches = \
