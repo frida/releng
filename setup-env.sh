@@ -873,11 +873,11 @@ fi
 
 vala_api_version=$(ls -1 "$FRIDA_TOOLROOT/share" | grep "vala-" | cut -f2 -d"-")
 valac=("$FRIDA_TOOLROOT/bin/valac-$vala_api_version")
-valac+=("--vapidir=$FRIDA_PREFIX/share/vala/vapi")
+vala_args=("--vapidir=$FRIDA_PREFIX/share/vala/vapi")
 if [ "$FRIDA_ENV_SDK" != 'none' ]; then
-  valac+=("--vapidir=$FRIDA_SDKROOT/share/vala/vapi")
+  vala_args+=("--vapidir=$FRIDA_SDKROOT/share/vala/vapi")
 fi
-valac+=("--vapidir=$FRIDA_TOOLROOT/share/vala-$vala_api_version/vapi")
+vala_args+=("--vapidir=$FRIDA_TOOLROOT/share/vala-$vala_api_version/vapi")
 
 pkg_config=("$FRIDA_TOOLROOT/bin/pkg-config")
 if [ "$FRIDA_ENV_NAME" != 'frida_gir' ]; then
@@ -976,6 +976,7 @@ array_to_args raw_cxx "${cxx[@]}"
 array_to_args raw_objc "${objc[@]}"
 array_to_args raw_objcxx "${objcxx[@]}"
 array_to_args raw_valac "${valac[@]}"
+array_to_args raw_vala_args "${vala_args[@]}"
 array_to_args raw_pkg_config "${pkg_config[@]}"
 array_to_args raw_pkg_config_path "${pkg_config_path[@]}"
 
@@ -1083,6 +1084,7 @@ array_to_args raw_cxx_link_flags "${cxx_link_flags[@]}"
   if [ -n "$objcxx" ]; then
     echo "objcpp_link_args = linker_flags + cxx_link_flags"
   fi
+  echo "vala_args = [$raw_vala_args]"
   echo "pkg_config_path = [$raw_pkg_config_path]"
   echo "b_lundef = $b_lundef"
   if [ $enable_asan = yes ]; then
