@@ -30,7 +30,6 @@ from releng import machine_spec, winenv
 BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
 
 DEPS_MK_PATH = RELENG_DIR / "deps.mk"
-BUILD_DIR = ROOT_DIR / "build"
 
 CONFIG_KEY_VALUE_PATTERN = re.compile(r"^([a-z]\w+) = (.*?)(?<!\\)$", re.MULTILINE | re.DOTALL)
 CONFIG_VARIABLE_REF_PATTERN = re.compile(r"\$\((\w+)\)")
@@ -237,7 +236,7 @@ def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool):
     if r.returncode != 1:
         raise CommandError(f"unable to access S3: {r.stdout.strip()}")
 
-    artifact = BUILD_DIR / filename
+    artifact = ROOT_DIR / "build" / filename
     if artifact.exists():
         artifact.unlink()
 
