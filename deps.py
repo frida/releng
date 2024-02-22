@@ -325,8 +325,8 @@ def bump():
                                   deps_content, flags=re.MULTILINE)
             DEPS_MK_PATH.write_bytes(deps_content.encode('utf-8'))
 
-            subprocess.run(["git", "add", "releng/deps.mk"], cwd=ROOT_DIR, check=True)
-            subprocess.run(["git", "commit", "-m" f"deps: Bump {pkg.name} to {latest[:7]}"], cwd=ROOT_DIR, check=True)
+            subprocess.run(["git", "add", "deps.mk"], cwd=RELENG_DIR, check=True)
+            subprocess.run(["git", "commit", "-m" f"deps: Bump {pkg.name} to {latest[:7]}"], cwd=RELENG_DIR, check=True)
 
         print("")
 
