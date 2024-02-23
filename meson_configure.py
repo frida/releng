@@ -323,6 +323,12 @@ def register_meson_options(meson_option_defs, group):
                                const=f"-D{name}={value_to_set}",
                                dest="main_meson_options",
                                **parse_option_meta(name, spec))
+            if option_type == "feature" and default_value == "auto":
+                group.add_argument(f"--disable-{pretty_name}",
+                                   action="append_const",
+                                   const=f"-D{name}=disabled",
+                                   dest="main_meson_options",
+                                   **parse_option_meta(name, spec))
         elif option_type == "combo":
             group.add_argument(f"--with-{pretty_name}",
                                choices=spec["choices"],
