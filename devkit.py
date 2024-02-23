@@ -210,7 +210,7 @@ class CompilerApplication:
 
             library_dirs = infer_library_dirs(library_flags)
             library_names = infer_library_names(library_flags)
-            library_paths, extra_flags = resolve_library_paths(library_names, library_dirs)
+            library_paths, extra_flags = resolve_library_paths(library_names, library_dirs, self.machine)
             extra_flags += infer_linker_flags(library_flags)
         else:
             (library_paths, extra_flags) = compute_custom_library_paths_and_flags(self.package, self.machine)
@@ -436,7 +436,7 @@ def infer_linker_flags(flags):
     return [flag for flag in flags if flag.startswith("-Wl") or flag == "-pthread"]
 
 
-def resolve_library_paths(names, dirs):
+def resolve_library_paths(names, dirs, machine):
     paths = []
     flags = []
     for name in names:
@@ -446,11 +446,17 @@ def resolve_library_paths(names, dirs):
             if candidate.exists():
                 library_path = candidate
                 break
-        if library_path is not None:
+        if library_path is not None and not is_os_library(library_path, machine):
             paths.append(library_path)
         else:
             flags.append(f"-l{name}")
     return (deduplicate(paths), flags)
+
+
+def is_os_library(path, machine):
+    if machine.os == "linux":
+        return path.name in {"libdl.a", "libm.a", "libpthread.a"}
+    return False
 
 
 def asset_path(name):
