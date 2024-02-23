@@ -223,14 +223,13 @@ class CompilerApplication:
         return (extra_flags, thirdparty_symbol_mappings)
 
     def _do_generate_library_msvc(self, library_paths):
-        machine = self.machine
         meson_config = self.meson_config
 
         lib_cmd = None
         if meson_config is not None:
             lib_cmd = meson_config.get("lib", None)
         if lib_cmd is None:
-            lib_cmd = [winenv.detect_msvs_tool_path(machine, "lib.exe")]
+            lib_cmd = [winenv.detect_msvs_tool_path(self.machine, "lib.exe")]
 
         subprocess.run(lib_cmd + ["/nologo", "/out:" + str(self.output_dir / self.library_filename)] + library_paths,
                        env=self.msvc_env,
