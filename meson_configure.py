@@ -175,9 +175,6 @@ def configure(project_srcroot,
             print_sdk_unknown_error(e)
             return 6
 
-    if "sdk:build" in allowed_prebuilds and "sdk:host" in allowed_prebuilds:
-        meson_options += ["-Dwrap_mode=nofallback"]
-
     call_selected_meson = lambda argv, *args, **kwargs: env.call_meson(argv,
                                                                        use_submodule=meson == "internal",
                                                                        *args, **kwargs)
