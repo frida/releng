@@ -6,7 +6,7 @@
     <IntDir>$(SolutionDir)build\tmp-windows\$(PlatformName)-$(Configuration)\$(ProjectName)\</IntDir>
     <FridaGumDefines>G_LOG_DOMAIN=&quot;Frida&quot;;GLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_74;G_DISABLE_DEPRECATED;HAVE_WINDOWS=1;HAVE_I386=1;HAVE_GIOOPENSSL=1;HAVE_GUMPP=1;HAVE_GUMJS=1;HAVE_FRIDA_GLIB=1;HAVE_FRIDA_LIBFFI=1;HAVE_QUICKJS=1;HAVE_TINYCC=1;HAVE_SQLITE=1;HAVE_OBJC_BRIDGE=1;HAVE_SWIFT_BRIDGE=1;HAVE_JAVA_BRIDGE=1</FridaGumDefines>
     <FridaCoreDefines>G_LOG_DOMAIN=&quot;Frida&quot;;GLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_74;G_DISABLE_DEPRECATED;HAVE_WINDOWS=1;HAVE_I386=1;HAVE_GIOOPENSSL=1;HAVE_NICE=1;VALA_EXTERN=extern</FridaCoreDefines>
-    <FridaCoreValaFlags>-D WINDOWS -D HAVE_GIOOPENSSL -D HAVE_NICE</FridaCoreValaFlags>
+    <FridaCoreValaFlags>-D WINDOWS -D HAVE_GIOOPENSSL -D HAVE_NICE -D HAVE_COMPILER_BACKEND</FridaCoreValaFlags>
     <FridaV8>Enabled</FridaV8>
     <Python>python</Python>
     <PythonLocation Condition="'$(PythonLocation)'=='' AND '$(Platform)'=='x64'">$(ProgramFiles)\Python310</PythonLocation>
