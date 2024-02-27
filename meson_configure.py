@@ -3,15 +3,16 @@ import json
 import os
 from pathlib import Path
 import platform
-import re
 import shlex
 import shutil
 import sys
 
-from . import deps, env, machine_spec
+sys.path.insert(0, str(Path(__file__).parent / "meson"))
+import mesonbuild.interpreter
+from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
+        UserComboOption, UserFeatureOption, UserStringOption
 
-OPTION_DEFS_PATTERN = re.compile(r"\boption\s*\(\s*'([^']+)'.*?,(.+?)\)", re.DOTALL)
-OPTION_PROP_KEYS_PATTERN = re.compile(r"\b(\w+)\s*:")
+from . import deps, env, machine_spec
 
 
 def main():
@@ -57,7 +58,7 @@ def main():
         meson_options_file = project_srcroot / "meson_options.txt"
     if meson_options_file.exists():
         meson_group = parser.add_argument_group(title="project-specific options")
-        meson_opts = register_meson_options(meson_options_file.read_text(encoding="utf-8"), meson_group)
+        meson_opts = register_meson_options(meson_options_file, meson_group)
 
     options = parser.parse_args()
 
@@ -283,92 +284,73 @@ def parse_bundle_type_set(raw_array):
     return result
 
 
-def register_meson_options(meson_option_defs, group):
-    hidden_constants = {
-        "true": True,
-        "false": False,
-    }
+def register_meson_options(meson_option_file, group):
+    interpreter = mesonbuild.optinterpreter.OptionInterpreter(subproject="")
+    interpreter.process(meson_option_file)
 
-    for match in OPTION_DEFS_PATTERN.finditer(meson_option_defs):
-        name = match.group(1)
+    for key, opt in interpreter.options.items():
+        name = key.name
         pretty_name = name.replace("_", "-")
 
-        raw_spec = OPTION_PROP_KEYS_PATTERN.sub(lambda m: '"' + m.group(1) + '":', match.group(2)) \
-                .replace("\n", " ")
-        spec = eval("{" + raw_spec + "}", hidden_constants)
-
-        option_type = spec["type"]
-        if option_type in {"boolean", "feature"}:
-            default_value = spec.get("value", None)
-
-            if option_type == "boolean":
-                value_when_enabled = "true"
-                value_when_disabled = "false"
-            else:
-                value_when_enabled = "enabled"
-                value_when_disabled = "disabled"
-
-            if default_value != value_when_enabled:
+        if isinstance(opt, UserFeatureOption):
+            if opt.value != "enabled":
                 action = "enable"
-                value_to_set = value_when_enabled
+                value_to_set = "enabled"
             else:
                 action = "disable"
-                value_to_set = value_when_disabled
-
+                value_to_set = "disabled"
             group.add_argument(f"--{action}-{pretty_name}",
                                action="append_const",
                                const=f"-D{name}={value_to_set}",
                                dest="main_meson_options",
-                               **parse_option_meta(name, spec))
-            if option_type == "feature" and default_value == "auto":
+                               **parse_option_meta(name, opt))
+            if opt.value == "auto":
                 group.add_argument(f"--disable-{pretty_name}",
                                    action="append_const",
                                    const=f"-D{name}=disabled",
                                    dest="main_meson_options",
-                                   **parse_option_meta(name, spec))
-        elif option_type == "combo":
+                                   **parse_option_meta(name, opt))
+        elif isinstance(opt, UserBooleanOption):
+            if not opt.value:
+                action = "enable"
+                value_to_set = "true"
+            else:
+                action = "disable"
+                value_to_set = "false"
+            group.add_argument(f"--{action}-{pretty_name}",
+                               action="append_const",
+                               const=f"-D{name}={value_to_set}",
+                               dest="main_meson_options",
+                               **parse_option_meta(name, opt))
+        elif isinstance(opt, UserComboOption):
             group.add_argument(f"--with-{pretty_name}",
-                               choices=spec["choices"],
+                               choices=opt.choices,
                                dest="meson_option:" + name,
-                               **parse_option_meta(name, spec))
-        elif option_type == "array":
+                               **parse_option_meta(name, opt))
+        elif isinstance(opt, UserArrayOption):
             group.add_argument(f"--with-{pretty_name}",
                                dest="meson_option:" + name,
-                               type=make_array_option_value_parser(spec),
-                               **parse_option_meta(name, spec))
+                               type=make_array_option_value_parser(opt),
+                               **parse_option_meta(name, opt))
         else:
             group.add_argument(f"--with-{pretty_name}",
                                dest="meson_option:" + name,
-                               **parse_option_meta(name, spec))
+                               **parse_option_meta(name, opt))
 
 
-def parse_option_meta(name, spec):
+def parse_option_meta(name, opt):
     params = {}
 
-    otype = spec["type"]
+    if isinstance(opt, UserStringOption):
+        val = repr(opt.value)
+    else:
+        val = opt.value
+    params["help"] = f"{opt.description} (default: {str(val).lower()})"
 
-    desc = spec.get("description", None)
-    if desc is not None:
-        val = spec.get("value", None)
-        if val is None:
-            if otype == "string":
-                val = ""
-            elif otype == "boolean":
-                val = True
-            elif otype == "combo":
-                val = spec["choices"][0]
-            elif otype == "integer":
-                val = 0
-            elif otype == "array":
-                val = []
-            elif otype == "feature":
-                val = "auto"
-        params["help"] = f"{desc} (default: {str(val).lower()})"
-
-    choices = spec.get("choices", None)
-    if choices is not None:
-        delimiter = "|" if otype == "combo" else ","
-        metavar = "{" + delimiter.join(choices) + "}"
+    if isinstance(opt, UserArrayOption):
+        metavar = "{" + ",".join(opt.choices) + "}"
+    elif isinstance(opt, UserComboOption):
+        metavar = "{" + "|".join(opt.choices) + "}"
     else:
         metavar = name.upper()
     params["metavar"] = metavar
@@ -394,18 +376,17 @@ def collect_meson_options(options):
     return result
 
 
-def make_array_option_value_parser(option_spec):
-    return lambda v: parse_array_option_value(v, option_spec)
+def make_array_option_value_parser(opt):
+    return lambda v: parse_array_option_value(v, opt)
 
 
-def parse_array_option_value(v, option_spec):
+def parse_array_option_value(v, opt):
     vals = [v.strip() for v in v.split(",")]
 
-    choices = option_spec.get("choices", None)
-    if choices is not None:
-        for v in vals:
-            if v not in choices:
-                pretty_choices = "', '".join(choices)
-                raise argparse.ArgumentTypeError(f"invalid array value: '{v}' (choose from '{pretty_choices}')")
+    choices = opt.choices
+    for v in vals:
+        if v not in choices:
+            pretty_choices = "', '".join(choices)
+            raise argparse.ArgumentTypeError(f"invalid array value: '{v}' (choose from '{pretty_choices}')")
 
     return vals
