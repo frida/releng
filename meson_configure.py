@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import platform
 import shlex
-import shutil
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent / "meson"))
@@ -72,8 +71,6 @@ def main():
             print(f"Already configured. Wipe .{os.sep}{build_dir.relative_to(work_dir)} to reconfigure.",
                   file=sys.stderr)
             sys.exit(1)
-        for item in build_dir.iterdir():
-            shutil.rmtree(item, ignore_errors=True)
 
     default_library = "shared" if options.enable_shared else "static"
 
