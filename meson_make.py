@@ -10,14 +10,17 @@ from . import env
 from .meson_configure import configure
 
 
+STANDARD_TARGET_NAMES = ["all", "clean", "distclean", "install", "test"]
+
+
 def main():
     project_srcroot = Path(sys.argv.pop(1)).resolve()
     build_dir = Path(sys.argv.pop(1)).resolve()
 
     parser = argparse.ArgumentParser(prog="make")
     parser.add_argument("targets",
+                        help="Targets to build, e.g.: " + ", ".join(STANDARD_TARGET_NAMES),
                         nargs="*",
-                        choices=["all", "clean", "distclean", "install", "test"],
                         default="all")
     options = parser.parse_args()
 
@@ -41,44 +44,82 @@ def make(project_srcroot, build_dir, targets):
     meson_env = {**os.environ, **env_config["env"]}
     meson_env["PATH"] = os.pathsep.join(env_config["paths"]) + os.pathsep + meson_env["PATH"]
 
+    compile_options = []
+    if os.environ.get("V", None) == "1":
+        compile_options += ["-v"]
+
+    test_options = shlex.split(os.environ.get("FRIDA_TEST_OPTIONS", "-v"))
+
+    standard_targets = {
+        "all": ["compile"] + compile_options,
+        "clean": ["compile", "--clean"] + compile_options,
+        "distclean": lambda: distclean(project_srcroot, build_dir),
+        "install": ["install"],
+        "test": ["test"] + test_options,
+    }
+
+    def do_meson_command(args):
+        return env.call_meson(args,
+                              use_submodule=env_config["meson"] == "internal",
+                              cwd=build_dir,
+                              env=meson_env).returncode
+
     exit_status = 0
+    pending_targets = targets.copy()
+    pending_compile = None
 
-    for target in targets:
-        if target == "distclean":
-            items_to_delete = []
+    while pending_targets:
+        target = pending_targets.pop(0)
 
-            if not build_dir.is_relative_to(project_srcroot):
-                items_to_delete += list(build_dir.iterdir())
+        action = standard_targets.get(target, None)
+        if action is None:
+            meson_command = "compile"
+        elif not callable(action):
+            meson_command = action[0]
+        else:
+            meson_command = None
 
-            items_to_delete += [
-                project_srcroot / "build",
-                project_srcroot / "deps",
-            ]
-
-            for item in items_to_delete:
-                try:
-                    shutil.rmtree(item)
-                except:
-                    pass
-
+        if meson_command == "compile":
+            if pending_compile is None:
+                pending_compile = ["compile"]
+            if action is not None:
+                pending_compile += action[1:]
+            else:
+                pending_compile += [target]
             continue
 
-        command = "compile" if target in {"all", "clean"} else target
+        if pending_compile is not None:
+            exit_status = do_meson_command(pending_compile)
+            pending_compile = None
+            if exit_status != 0:
+                break
 
-        options = []
-        if target == "clean":
-            options += ["--clean"]
-        elif target == "test":
-            options += shlex.split(os.environ.get("FRIDA_TEST_OPTIONS", "-v"))
+        if meson_command is not None:
+            exit_status = do_meson_command(action)
+            if exit_status != 0:
+                break
+        else:
+            action()
 
-        if command == "compile" and os.environ.get("V", None) == "1":
-            options += ["-v"]
-
-        exit_status = env.call_meson([command] + options,
-                                     use_submodule=env_config["meson"] == "internal",
-                                     cwd=build_dir,
-                                     env=meson_env).returncode
-        if exit_status != 0:
-            return exit_status
+    if exit_status == 0 and pending_compile is not None:
+        exit_status = do_meson_command(pending_compile)
 
     return exit_status
+
+
+def distclean(project_srcroot, build_dir):
+    items_to_delete = []
+
+    if not build_dir.is_relative_to(project_srcroot):
+        items_to_delete += list(build_dir.iterdir())
+
+    items_to_delete += [
+        project_srcroot / "build",
+        project_srcroot / "deps",
+    ]
+
+    for item in items_to_delete:
+        try:
+            shutil.rmtree(item)
+        except:
+            pass
