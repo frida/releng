@@ -124,6 +124,9 @@ def init_machine_config(machine: MachineSpec,
             "-lc++",
             "-lc++abi",
         ])
+    else:
+        constants["cxx_like_flags"] = strv_to_meson([])
+        constants["cxx_link_flags"] = strv_to_meson([])
 
     options = config["built-in options"]
     options["c_args"] = "c_like_flags"
