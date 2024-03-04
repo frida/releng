@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from configparser import ConfigParser
 import io
 import os
@@ -131,16 +132,19 @@ def generate_machine_config(machine: MachineSpec,
                             toolchain_prefix: Optional[Path],
                             default_library: DefaultLibrary,
                             call_selected_meson: Callable) -> Optional[str]:
-    config = ConfigParser()
-
-    config["host_machine"] = {
-        "system": str_to_meson(machine.system),
-        "subsystem": str_to_meson(machine.subsystem),
-        "kernel": str_to_meson(machine.kernel),
-        "cpu_family": str_to_meson(machine.cpu_family),
-        "cpu": str_to_meson(machine.cpu),
-        "endian": str_to_meson(machine.endian),
-    }
+    config = ConfigParser(dict_type=OrderedDict)
+    config["constants"] = OrderedDict()
+    config["binaries"] = OrderedDict()
+    config["built-in options"] = OrderedDict()
+    config["properties"] = OrderedDict()
+    config["host_machine"] = OrderedDict([
+        ("system", str_to_meson(machine.system)),
+        ("subsystem", str_to_meson(machine.subsystem)),
+        ("kernel", str_to_meson(machine.kernel)),
+        ("cpu_family", str_to_meson(machine.cpu_family)),
+        ("cpu", str_to_meson(machine.cpu)),
+        ("endian", str_to_meson(machine.endian)),
+    ])
 
     if machine.is_apple:
         impl = env_apple

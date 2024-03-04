@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from configparser import ConfigParser
 import os
 from pathlib import Path
@@ -157,15 +158,14 @@ def init_machine_config(machine: MachineSpec,
 
     allow_undefined_symbols = machine.os == "freebsd"
 
-    config["built-in options"] = {
-        "c_args": "c_like_flags",
-        "cpp_args": "c_like_flags + cxx_like_flags",
-        "c_link_args": "linker_flags",
-        "cpp_link_args": "linker_flags + cxx_link_flags",
-        "b_lundef": str(not allow_undefined_symbols).lower(),
-    }
+    options = config["built-in options"]
+    options["c_args"] = "c_like_flags"
+    options["cpp_args"] = "c_like_flags + cxx_like_flags"
+    options["c_link_args"] = "linker_flags"
+    options["cpp_link_args"] = "linker_flags + cxx_link_flags"
+    options["b_lundef"] = str(not allow_undefined_symbols).lower()
 
-    binaries = {}
+    binaries = OrderedDict()
     cc = None
 
     triplet = machine.triplet
@@ -175,8 +175,8 @@ def init_machine_config(machine: MachineSpec,
         if gcc is not None:
             cc = [gcc]
             binaries["c"] = strv_to_meson(cc) + " + common_flags"
-            for identifier in {"cpp", "ar", "nm", "ranlib", "strip",
-                               "readelf", "objcopy", "objdump"}:
+            for identifier in ["cpp", "ar", "nm", "ranlib", "strip",
+                               "readelf", "objcopy", "objdump"]:
                 name = "g++" if identifier == "cpp" else identifier
                 val = shutil.which(toolprefix + name)
                 if val is not None:
@@ -220,7 +220,7 @@ def init_machine_config(machine: MachineSpec,
                 mcfg.read(machine_file)
 
                 for section in mcfg.sections():
-                    copy = config[section] if section in config else {}
+                    copy = config[section] if section in config else OrderedDict()
                     for key, val in mcfg.items(section):
                         if section == "binaries":
                             if key in {"c", "cpp"}:
@@ -255,12 +255,10 @@ def init_machine_config(machine: MachineSpec,
             link = [str(winenv.detect_msvs_tool_path(machine, "link.exe"))]
 
             raw_cc = strv_to_meson(cc) + " + common_flags"
-            binaries.update({
-                "c": raw_cc,
-                "cpp": raw_cc,
-                "lib": strv_to_meson(lib) + " + common_flags",
-                "link": strv_to_meson(link) + " + common_flags",
-            })
+            binaries["c"] = raw_cc
+            binaries["cpp"] = raw_cc
+            binaries["lib"] = strv_to_meson(lib) + " + common_flags"
+            binaries["link"] = strv_to_meson(link) + " + common_flags"
 
             vc_dir = winenv.detect_msvs_installation_dir() / "VC"
             vc_installdir = str(vc_dir) + "\\"
@@ -295,8 +293,8 @@ def init_machine_config(machine: MachineSpec,
         binaries["strip"] = strip_binary[:-1] + f", '{strip_arg}']"
 
     if linker_flavor == "msvc":
-        for gnu_tool in {"ar", "as", "ld", "nm", "objcopy", "objdump",
-                         "ranlib", "readelf", "size", "strip", "windres"}:
+        for gnu_tool in ["ar", "as", "ld", "nm", "objcopy", "objdump",
+                         "ranlib", "readelf", "size", "strip", "windres"]:
             binaries.pop(gnu_tool, None)
 
         if machine.arch == "x86":
@@ -332,15 +330,14 @@ def init_machine_config(machine: MachineSpec,
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
 
-    config["binaries"] = binaries
+    config["binaries"].update(binaries)
 
-    config["constants"] = {
-        "common_flags": strv_to_meson(common_flags),
-        "c_like_flags": strv_to_meson(c_like_flags),
-        "linker_flags": strv_to_meson(linker_flags),
-        "cxx_like_flags": strv_to_meson(cxx_like_flags),
-        "cxx_link_flags": strv_to_meson(cxx_link_flags),
-    }
+    constants = config["constants"]
+    constants["common_flags"] = strv_to_meson(common_flags)
+    constants["c_like_flags"] = strv_to_meson(c_like_flags)
+    constants["linker_flags"] = strv_to_meson(linker_flags)
+    constants["cxx_like_flags"] = strv_to_meson(cxx_like_flags)
+    constants["cxx_link_flags"] = strv_to_meson(cxx_link_flags)
 
     return (machine_path, machine_env)
 

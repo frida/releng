@@ -92,7 +92,7 @@ def init_machine_config(machine: MachineSpec,
 
     llvm_bindir = ndk_root / "toolchains" / "llvm" / "prebuilt" / f"{android_build_os}-{android_build_arch}" / "bin"
 
-    binaries = {}
+    binaries = config["binaries"]
     for (identifier, tool_name, *rest) in NDK_BINARIES:
         path = llvm_bindir / tool_name
 
@@ -105,7 +105,6 @@ def init_machine_config(machine: MachineSpec,
             raw_val += " + common_flags"
 
         binaries[identifier] = raw_val
-    config["binaries"] = binaries
 
     common_flags = [
         "-target", f"{machine.cpu}-none-linux-android{android_api}",
@@ -132,20 +131,18 @@ def init_machine_config(machine: MachineSpec,
     if android_api < 24:
         cxx_like_flags += ["-D_LIBCPP_HAS_NO_OFF_T_FUNCTIONS"]
 
-    config["constants"] = {
-        "common_flags": strv_to_meson(common_flags),
-        "c_like_flags": strv_to_meson(c_like_flags),
-        "linker_flags": strv_to_meson(linker_flags),
-        "cxx_like_flags": strv_to_meson(cxx_like_flags),
-        "cxx_link_flags": strv_to_meson(cxx_link_flags),
-    }
+    constants = config["constants"]
+    constants["common_flags"] = strv_to_meson(common_flags)
+    constants["c_like_flags"] = strv_to_meson(c_like_flags)
+    constants["linker_flags"] = strv_to_meson(linker_flags)
+    constants["cxx_like_flags"] = strv_to_meson(cxx_like_flags)
+    constants["cxx_link_flags"] = strv_to_meson(cxx_link_flags)
 
-    config["built-in options"] = {
-        "c_args": "c_like_flags",
-        "cpp_args": "c_like_flags + cxx_like_flags",
-        "c_link_args": "linker_flags",
-        "cpp_link_args": "linker_flags + cxx_link_flags",
-        "b_lundef": "true",
-    }
+    options = config["built-in options"]
+    options["c_args"] = "c_like_flags"
+    options["cpp_args"] = "c_like_flags + cxx_like_flags"
+    options["c_link_args"] = "linker_flags"
+    options["cpp_link_args"] = "linker_flags + cxx_link_flags"
+    options["b_lundef"] = "true"
 
     return (machine_path, machine_env)

@@ -65,7 +65,7 @@ def init_machine_config(machine: MachineSpec,
                               capture_output=True,
                               encoding="utf-8").stdout.strip()
 
-    binaries = {}
+    binaries = config["binaries"]
     clang_path = None
     for (identifier, tool_name, *rest) in APPLE_BINARIES:
         if tool_name.startswith("#"):
@@ -87,7 +87,6 @@ def init_machine_config(machine: MachineSpec,
             raw_val += " + common_flags"
 
         binaries[identifier] = raw_val
-    config["binaries"] = binaries
 
     clang_arch = APPLE_CLANG_ARCHS.get(machine.arch, machine.arch)
 
@@ -104,42 +103,37 @@ def init_machine_config(machine: MachineSpec,
         # at least as of Xcode 15.0 beta 7.
         linker_flags += ["-Wl,-ld_classic"]
 
-    constants = {
-        "common_flags": strv_to_meson([
-            "-target", target,
-            "-isysroot", sdk_path,
-        ]),
-        "c_like_flags": strv_to_meson([]),
-        "linker_flags": strv_to_meson(linker_flags),
-    }
+    constants = config["constants"]
+    constants["common_flags"] = strv_to_meson([
+        "-target", target,
+        "-isysroot", sdk_path,
+    ])
+    constants["c_like_flags"] = strv_to_meson([])
+    constants["linker_flags"] = strv_to_meson(linker_flags)
 
     if sdk_prefix is not None \
             and (sdk_prefix / "lib" / "c++" / "libc++.a").exists() \
             and machine.os != "watchos":
-        constants.update({
-            "cxx_like_flags": strv_to_meson([
-                "-nostdinc++",
-                "-isystem" + str(sdk_prefix / "include" / "c++"),
-            ]),
-            "cxx_link_flags": strv_to_meson([
-                "-nostdlib++",
-                "-L" + str(sdk_prefix / "lib" / "c++"),
-                "-lc++",
-                "-lc++abi",
-            ]),
-        })
-    config["constants"] = constants
+        constants["cxx_like_flags"] = strv_to_meson([
+            "-nostdinc++",
+            "-isystem" + str(sdk_prefix / "include" / "c++"),
+        ])
+        constants["cxx_link_flags"] = strv_to_meson([
+            "-nostdlib++",
+            "-L" + str(sdk_prefix / "lib" / "c++"),
+            "-lc++",
+            "-lc++abi",
+        ])
 
-    config["built-in options"] = {
-        "c_args": "c_like_flags",
-        "cpp_args": "c_like_flags + cxx_like_flags",
-        "objc_args": "c_like_flags",
-        "objcpp_args": "c_like_flags + cxx_like_flags",
-        "c_link_args": "linker_flags",
-        "cpp_link_args": "linker_flags + cxx_link_flags",
-        "objc_link_args": "linker_flags",
-        "objcpp_link_args": "linker_flags + cxx_link_flags",
-        "b_lundef": "true",
-    }
+    options = config["built-in options"]
+    options["c_args"] = "c_like_flags"
+    options["cpp_args"] = "c_like_flags + cxx_like_flags"
+    options["objc_args"] = "c_like_flags"
+    options["objcpp_args"] = "c_like_flags + cxx_like_flags"
+    options["c_link_args"] = "linker_flags"
+    options["cpp_link_args"] = "linker_flags + cxx_link_flags"
+    options["objc_link_args"] = "linker_flags"
+    options["objcpp_link_args"] = "linker_flags + cxx_link_flags"
+    options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
