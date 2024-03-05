@@ -95,15 +95,19 @@ class CompilerApplication:
 
         machine = self.machine
         flavor = self.flavor
+        meson_config = self.meson_config
 
-        if self.compiler_argument_syntax == "msvc":
-            gir_path = REPO_ROOT / "build" / f"tmp{flavor}-windows" / msvs_arch_config(machine) / "frida-core" / "Frida-1.0.gir"
+        if meson_config is not None:
+            gir_path = Path(query_pkgconfig_variable("frida_girdir", self.package, meson_config)) / "Frida-1.0.gir"
         else:
-            gir_path = REPO_ROOT / "build" / f"tmp{flavor}-{machine.identifier}" / "frida-core" / "src" / "Frida-1.0.gir"
+            if self.compiler_argument_syntax == "msvc":
+                gir_path = REPO_ROOT / "build" / f"tmp{flavor}-windows" / msvs_arch_config(machine) / "frida-core" / "Frida-1.0.gir"
+            else:
+                gir_path = REPO_ROOT / "build" / f"tmp{flavor}-{machine.identifier}" / "frida-core" / "src" / "Frida-1.0.gir"
 
         gir_name = "frida-core.gir"
 
-        shutil.copy(str(gir_path), str(self.output_dir / gir_name))
+        shutil.copy(gir_path, self.output_dir / gir_name)
 
         return [gir_name]
 
@@ -466,6 +470,10 @@ def asset_path(name):
 def query_pkgconfig_cflags(package, meson_config):
     raw_flags = call_pkgconfig(["--cflags", package], meson_config)
     return shlex.split(raw_flags)
+
+
+def query_pkgconfig_variable(name, package, meson_config):
+    return call_pkgconfig([f"--variable={name}", package], meson_config)
 
 
 def call_pkgconfig(argv, meson_config):
