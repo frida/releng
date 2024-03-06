@@ -94,7 +94,7 @@ def init_machine_config(machine: MachineSpec,
 
     binaries = config["binaries"]
     for (identifier, tool_name, *rest) in NDK_BINARIES:
-        path = llvm_bindir / tool_name
+        path = llvm_bindir / f"{tool_name}{native_machine.executable_suffix}"
 
         argv = [str(path)]
         if len(rest) != 0:
