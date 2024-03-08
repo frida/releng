@@ -35,6 +35,9 @@ def main():
                       help="cross-compile to build binaries to run on HOST",
                       metavar="HOST",
                       type=machine_spec.parse)
+    opts.add_argument("--enable-symbols",
+                      help="build binaries with debug symbols included (default: disabled)",
+                      action="store_true")
     opts.add_argument("--enable-shared",
                       help="enable building shared libraries (default: disabled)",
                       action="store_true")
@@ -357,6 +360,9 @@ def parse_option_meta(name, opt):
 
 def collect_meson_options(options):
     result = []
+
+    if not options.enable_symbols:
+        result += ["--strip"]
 
     for raw_name, raw_val in vars(options).items():
         if raw_val is None:
