@@ -34,7 +34,7 @@ APPLE_MINIMUM_OS_VERSIONS = {
 
 APPLE_BINARIES = [
     ("c",                 "clang"),
-    ("cpp",               "clang++", ["-stdlib=libc++"]),
+    ("cpp",               "clang++"),
     ("objc",              "#c"),
     ("objcpp",            "#cpp"),
 
@@ -65,6 +65,10 @@ def init_machine_config(machine: MachineSpec,
                               capture_output=True,
                               encoding="utf-8").stdout.strip()
 
+    use_static_libcxx = sdk_prefix is not None \
+            and (sdk_prefix / "lib" / "c++" / "libc++.a").exists() \
+            and machine.os != "watchos"
+
     binaries = config["binaries"]
     clang_path = None
     for (identifier, tool_name, *rest) in APPLE_BINARIES:
@@ -81,6 +85,8 @@ def init_machine_config(machine: MachineSpec,
         argv = [path]
         if len(rest) != 0:
             argv += rest[0]
+        if identifier == "cpp" and not use_static_libcxx:
+            argv += ["-stdlib=libc++"]
 
         raw_val = str(argv)
         if identifier in {"c", "cpp"}:
@@ -111,9 +117,7 @@ def init_machine_config(machine: MachineSpec,
     constants["c_like_flags"] = strv_to_meson([])
     constants["linker_flags"] = strv_to_meson(linker_flags)
 
-    if sdk_prefix is not None \
-            and (sdk_prefix / "lib" / "c++" / "libc++.a").exists() \
-            and machine.os != "watchos":
+    if use_static_libcxx:
         constants["cxx_like_flags"] = strv_to_meson([
             "-nostdinc++",
             "-isystem" + str(sdk_prefix / "include" / "c++"),

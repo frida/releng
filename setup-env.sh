@@ -629,7 +629,7 @@ case $host_os in
     esac
 
     cc=("$($xcrun --sdk $apple_sdk -f clang)")
-    cxx=("$($xcrun --sdk $apple_sdk -f clang++)" "-stdlib=libc++")
+    cxx=("$($xcrun --sdk $apple_sdk -f clang++)")
     objc=("${cc[@]}")
     objcxx=("${cxx[@]}")
 
@@ -661,6 +661,9 @@ case $host_os in
     if [ $have_static_libcxx = yes ] && [ $enable_asan = no ]; then
       cxx_like_flags+=("-nostdinc++" "-isystem$FRIDA_SDKROOT/include/c++")
       cxx_link_flags+=("-nostdlib++" "-L$FRIDA_SDKROOT/lib/c++" "-lc++" "-lc++abi")
+    else
+      cxx+=("-stdlib=libc++")
+      objcxx+=("-stdlib=libc++")
     fi
 
     ;;
