@@ -350,9 +350,9 @@ case $host_os in
     read_toolchain_variable cc CC ${toolprefix}gcc
     read_toolchain_variable cxx CXX ${toolprefix}g++
 
-    read_toolchain_variable ar AR ${toolprefix}ar
-    read_toolchain_variable nm NM ${toolprefix}nm
-    read_toolchain_variable ranlib RANLIB ${toolprefix}ranlib
+    read_toolchain_variable ar AR ${toolprefix}gcc-ar
+    read_toolchain_variable nm NM ${toolprefix}gcc-nm
+    read_toolchain_variable ranlib RANLIB ${toolprefix}gcc-ranlib
     read_toolchain_variable strip STRIP ${toolprefix}strip
     strip+=("--strip-all")
 
@@ -489,9 +489,9 @@ case $host_os in
     eval cc=($cc)
     eval cxx=($cxx)
 
-    read_toolchain_variable ar AR ${toolprefix}ar
-    read_toolchain_variable nm NM ${toolprefix}nm
-    read_toolchain_variable ranlib RANLIB ${toolprefix}ranlib
+    read_toolchain_variable ar AR ${toolprefix}gcc-ar
+    read_toolchain_variable nm NM ${toolprefix}gcc-nm
+    read_toolchain_variable ranlib RANLIB ${toolprefix}gcc-ranlib
     read_toolchain_variable strip STRIP ${toolprefix}strip
     strip+=("--strip-all")
 
@@ -789,14 +789,14 @@ case $host_os in
     read_toolchain_variable cc CC ${toolprefix}clang
     read_toolchain_variable cxx CXX ${toolprefix}clang++
 
-    read_toolchain_variable ar AR ${toolprefix}ar
-    read_toolchain_variable nm NM ${toolprefix}nm
-    read_toolchain_variable ranlib RANLIB ${toolprefix}ranlib
-    read_toolchain_variable strip STRIP ${toolprefix}strip
+    read_toolchain_variable ar AR ${toolprefix}llvm-ar
+    read_toolchain_variable nm NM ${toolprefix}llvm-nm
+    read_toolchain_variable ranlib RANLIB ${toolprefix}llvm-ranlib
+    read_toolchain_variable strip STRIP ${toolprefix}llvm-strip
     strip+=("--strip-all")
 
-    read_toolchain_variable readelf READELF ${toolprefix}readelf
-    read_toolchain_variable objcopy OBJCOPY ${toolprefix}objcopy
+    read_toolchain_variable readelf READELF ${toolprefix}llvm-readelf
+    read_toolchain_variable objcopy OBJCOPY ${toolprefix}llvm-objcopy
 
     c_like_flags+=("-ffunction-sections" "-fdata-sections")
     linker_flags+=("-Wl,--gc-sections")
@@ -842,9 +842,9 @@ case $host_os in
     cc=("$qnx_toolchain_prefix-gcc")
     cxx=("$qnx_toolchain_prefix-g++")
 
-    ar=("$qnx_toolchain_prefix-ar")
-    nm=("$qnx_toolchain_prefix-nm")
-    ranlib=("$qnx_toolchain_prefix-ranlib")
+    ar=("$qnx_toolchain_prefix-gcc-ar")
+    nm=("$qnx_toolchain_prefix-gcc-nm")
+    ranlib=("$qnx_toolchain_prefix-gcc-ranlib")
     strip=("$qnx_toolchain_prefix-strip" "--strip-all")
 
     readelf=("$qnx_toolchain_prefix-readelf")

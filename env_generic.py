@@ -138,6 +138,13 @@ TOOLCHAIN_ENVVARS = {
     "CSFLAGS",
 }
 
+GCC_TOOL_NAMES = {
+    "cpp": "g++",
+    "ar": "gcc-ar",
+    "nm": "gcc-nm",
+    "ranlib": "gcc-ranlib",
+}
+
 
 class CompilerNotFoundError(Exception):
     pass
@@ -177,7 +184,7 @@ def init_machine_config(machine: MachineSpec,
             binaries["c"] = strv_to_meson(cc) + " + common_flags"
             for identifier in ["cpp", "ar", "nm", "ranlib", "strip",
                                "readelf", "objcopy", "objdump"]:
-                name = "g++" if identifier == "cpp" else identifier
+                name = GCC_TOOL_NAMES.get(identifier, identifier)
                 val = shutil.which(toolprefix + name)
                 if val is not None:
                     extra = " + common_flags" if identifier == "cpp" else ""
