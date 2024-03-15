@@ -14,7 +14,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import urllib.request
 
 RELENG_DIR = Path(__file__).parent.resolve()
@@ -86,7 +86,9 @@ def main():
     command.add_argument("bundle", help="bundle to roll", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
     command.add_argument("--activate", default=False, action='store_true')
-    command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], machine_spec.parse(args.host), args.activate))
+    command.add_argument("--post", help="post-processing script")
+    command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], machine_spec.parse(args.host), args.activate,
+                                                Path(args.post) if args.post is not None else None)
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", help="bundle to wait for", choices=bundle_choices)
@@ -208,7 +210,7 @@ def sync(bundle: Bundle, machine: machine_spec.MachineSpec, location: Path):
             archive_path.unlink()
 
 
-def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool):
+def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool, post: Optional[Path]):
     params = read_dependency_parameters()
     version = params.deps_version
 
@@ -257,6 +259,20 @@ def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool):
                            "-C", ROOT_DIR,
                            "-f", "Makefile.{}.mk".format(bundle.name.lower()),
                            "FRIDA_HOST=" + machine.identifier,
+                       ],
+                       check=True)
+
+    if post is not None:
+        post_script = RELENG_DIR / post
+        if not post_script.exists():
+            raise CommandError("post-processing script not found")
+
+        subprocess.run([
+                           sys.executable, post_script,
+                           "--bundle=" + bundle.name.lower(),
+                           "--host=" + machine.identifier,
+                           "--artifact=" + artifact,
+                           "--version=" + version,
                        ],
                        check=True)
 
