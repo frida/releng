@@ -88,7 +88,7 @@ def main():
     command.add_argument("--activate", default=False, action='store_true')
     command.add_argument("--post", help="post-processing script")
     command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], machine_spec.parse(args.host), args.activate,
-                                                Path(args.post) if args.post is not None else None)
+                                                Path(args.post) if args.post is not None else None))
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", help="bundle to wait for", choices=bundle_choices)
