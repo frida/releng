@@ -22,6 +22,7 @@ frida_core_flags := \
 	--default-library static \
 	$(FRIDA_FLAGS_COMMON) \
 	-Dconnectivity=$(FRIDA_CONNECTIVITY) \
+	-Dtests=enabled \
 	$(FRIDA_MAPPER)
 
 frida_tools = \
