@@ -7,7 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
-from typing import Callable, Literal, Optional, Sequence
+from typing import Callable, Literal, Optional, Sequence, Tuple
 
 from . import deps, env_android, env_apple, env_generic, machine_file
 from .machine_file import str_to_meson, strv_to_meson
@@ -188,12 +188,12 @@ def generate_machine_config(machine: MachineSpec,
                 pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
             binaries["pkg-config"] = strv_to_meson(pkg_config)
 
-        valac_datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
-        if valac_datadir is not None:
-            vala_api_version = valac_datadir.name.split("-", maxsplit=1)[1]
+        vala_compiler = detect_toolchain_vala_compiler(toolchain_prefix, native_machine)
+        if vala_compiler is not None:
+            valac, vapidir = vala_compiler
             binaries["vala"] = strv_to_meson([
-                str(toolchain_bindir / f"valac-{vala_api_version}{exe_suffix}"),
-                "--vapidir=" + str(valac_datadir / "vapi"),
+                str(valac),
+                f"--vapidir={vapidir}",
             ])
 
         if sdk_prefix is not None:
@@ -220,6 +220,19 @@ def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
     toolchain_prefix = query_toolchain_prefix(machine, deps_dir)
     deps.sync(deps.Bundle.TOOLCHAIN, machine, toolchain_prefix)
     return toolchain_prefix
+
+
+def detect_toolchain_vala_compiler(toolchain_prefix: Path,
+                                   native_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
+    datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
+    if datadir is None:
+        return None
+
+    api_version = datadir.name.split("-", maxsplit=1)[1]
+
+    valac = toolchain_prefix / "bin" / f"valac-{api_version}{native_machine.executable_suffix}"
+    vapidir = datadir / "vapi"
+    return (valac, vapidir)
 
 
 def query_sdk_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
