@@ -5,11 +5,12 @@ from pathlib import Path
 import platform
 import shlex
 import sys
+from typing import Any, Callable, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).parent / "meson"))
 import mesonbuild.interpreter
 from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
-        UserComboOption, UserFeatureOption, UserStringOption
+        UserComboOption, UserFeatureOption, UserOption, UserStringOption
 
 from . import deps, env, machine_spec
 
@@ -92,15 +93,15 @@ def main():
     sys.exit(exit_status)
 
 
-def configure(project_srcroot,
-              build_dir,
-              prefix=None,
-              build_machine=None,
-              host_machine=None,
-              default_library="static",
-              allowed_prebuilds=None,
-              meson="internal",
-              extra_meson_options=[]):
+def configure(project_srcroot: Path,
+              build_dir: Path,
+              prefix: Optional[str] = None,
+              build_machine: Optional[machine_spec.MachineSpec] = None,
+              host_machine: Optional[machine_spec.MachineSpec] = None,
+              default_library: str = "static",
+              allowed_prebuilds: Sequence[str] = None,
+              meson: str = "internal",
+              extra_meson_options: List[str] = []):
     if prefix is None:
         prefix = env.detect_native_default_prefix()
 
@@ -227,32 +228,32 @@ def configure(project_srcroot,
     return process.returncode
 
 
-def print_toolchain_not_found_error(e):
+def print_toolchain_not_found_error(e: deps.BundleNotFoundError):
     print(f"Unable to download toolchain: {e}", file=sys.stderr)
     print(f"Specify --without-prebuilds=toolchain to only use tools on your PATH.", file=sys.stderr)
 
 
-def print_toolchain_unknown_error(e):
+def print_toolchain_unknown_error(e: Exception):
     print(f"Unable to prepare toolchain: {e}", file=sys.stderr)
 
 
-def print_sdk_not_found_error(e):
+def print_sdk_not_found_error(e: deps.BundleNotFoundError):
     print(f"Unable to download SDK: {e}", file=sys.stderr)
     print(f"Specify --without-prebuilds=sdk[:{{build|host}}] to build dependencies from source code.", file=sys.stderr)
 
 
-def print_sdk_unknown_error(e):
+def print_sdk_unknown_error(e: Exception):
     print(f"Unable to prepare SDK: {e}", file=sys.stderr)
 
 
-def parse_prefix(raw_prefix):
+def parse_prefix(raw_prefix: str) -> Path:
     prefix = Path(raw_prefix)
     if not prefix.is_absolute():
         prefix = Path(os.getcwd()) / prefix
     return prefix
 
 
-def query_supported_bundle_types(include_wildcards):
+def query_supported_bundle_types(include_wildcards: bool) -> List[str]:
     for e in deps.Bundle:
         identifier = e.name.lower()
         if e == deps.Bundle.SDK:
@@ -264,11 +265,11 @@ def query_supported_bundle_types(include_wildcards):
             yield identifier
 
 
-def query_supported_bundle_type_values():
+def query_supported_bundle_type_values() -> List[deps.Bundle]:
     return [e for e in deps.Bundle]
 
 
-def parse_bundle_type_set(raw_array):
+def parse_bundle_type_set(raw_array: str) -> List[str]:
     supported_types = list(query_supported_bundle_types(include_wildcards=True))
     result = set()
     for element in raw_array.split(","):
@@ -284,7 +285,7 @@ def parse_bundle_type_set(raw_array):
     return result
 
 
-def register_meson_options(meson_option_file, group):
+def register_meson_options(meson_option_file: Path, group: argparse._ArgumentGroup):
     interpreter = mesonbuild.optinterpreter.OptionInterpreter(subproject="")
     interpreter.process(meson_option_file)
 
@@ -338,7 +339,7 @@ def register_meson_options(meson_option_file, group):
                                **parse_option_meta(name, opt))
 
 
-def parse_option_meta(name, opt):
+def parse_option_meta(name: str, opt: UserOption[Any]):
     params = {}
 
     if isinstance(opt, UserStringOption):
@@ -358,7 +359,7 @@ def parse_option_meta(name, opt):
     return params
 
 
-def collect_meson_options(options):
+def collect_meson_options(options: argparse.Namespace) -> List[str]:
     result = []
 
     if not options.enable_symbols:
@@ -379,11 +380,11 @@ def collect_meson_options(options):
     return result
 
 
-def make_array_option_value_parser(opt):
+def make_array_option_value_parser(opt: UserOption[Any]) -> Callable[[str], List[str]]:
     return lambda v: parse_array_option_value(v, opt)
 
 
-def parse_array_option_value(v, opt):
+def parse_array_option_value(v: str, opt: UserArrayOption) -> List[str]:
     vals = [v.strip() for v in v.split(",")]
 
     choices = opt.choices
