@@ -39,10 +39,6 @@ def enumerate_build_dirs(build_dir: Path):
     return build_dir.glob("tmp-*/*")
 
 
-def query_devkit_output_dir(name: str, build_dir: Path) -> Path:
-    return build_dir / "devkits" / name
-
-
 def detect_native_machine() -> MachineSpec:
     nos = detect_native_os()
     config = "release" if nos == "windows" else None
