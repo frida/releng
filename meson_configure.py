@@ -134,12 +134,11 @@ def configure(project_srcroot: Path,
     ]
     extra_paths = []
 
-    if len(allowed_prebuilds) != 0:
-        raw_deps_dir = os.environ.get("FRIDA_DEPS", None)
-        if raw_deps_dir is not None:
-            deps_dir = Path(raw_deps_dir)
-        else:
-            deps_dir = project_srcroot / "deps"
+    raw_deps_dir = os.environ.get("FRIDA_DEPS", None)
+    if raw_deps_dir is not None:
+        deps_dir = Path(raw_deps_dir)
+    else:
+        deps_dir = project_srcroot / "deps"
 
     allow_prebuilt_toolchain = "toolchain" in allowed_prebuilds
     if allow_prebuilt_toolchain:
