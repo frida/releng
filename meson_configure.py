@@ -154,12 +154,14 @@ def configure(project_srcroot: Path,
     else:
         if project_depends_on_vala_compiler(project_srcroot):
             toolchain_prefix = env.query_toolchain_prefix(build_machine, deps_dir)
-            try:
-                build_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
-            except subprocess.CalledProcessError as e:
-                print(e, file=sys.stderr)
-                print("Output:\n\t| " + "\n\t| ".join(e.output.strip().split("\n")), file=sys.stderr)
-                return 70
+            vala_compiler = env.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
+            if vala_compiler is None:
+                try:
+                    build_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
+                except subprocess.CalledProcessError as e:
+                    print(e, file=sys.stderr)
+                    print("Output:\n\t| " + "\n\t| ".join(e.output.strip().split("\n")), file=sys.stderr)
+                    return 70
         else:
             toolchain_prefix = None
     if toolchain_prefix is not None:
