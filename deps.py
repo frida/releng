@@ -271,7 +271,7 @@ def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool, post
                            sys.executable, post_script,
                            "--bundle=" + bundle.name.lower(),
                            "--host=" + machine.identifier,
-                           "--artifact=" + artifact,
+                           "--artifact=" + str(artifact),
                            "--version=" + version,
                        ],
                        check=True)
