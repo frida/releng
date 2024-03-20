@@ -176,21 +176,16 @@ def generate_machine_config(machine: MachineSpec,
             if tool_path.exists():
                 binaries[tool_name] = strv_to_meson([str(tool_path)])
 
-        pkg_config = [
-            str(toolchain_bindir / f"pkg-config{exe_suffix}"),
-        ]
-        if default_library == "static":
-            pkg_config += ["--static"]
-        if sdk_prefix is not None:
-            pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
-        binaries["pkg-config"] = strv_to_meson(pkg_config)
-
-        valac_datadir = next((toolchain_prefix / "share").glob("vala-*"))
-        vala_api_version = valac_datadir.name.split("-", maxsplit=1)[1]
-        binaries["vala"] = strv_to_meson([
-            str(toolchain_bindir / f"valac-{vala_api_version}{exe_suffix}"),
-            "--vapidir=" + str(valac_datadir / "vapi"),
-        ])
+        pkg_config_binary = toolchain_bindir / f"pkg-config{exe_suffix}"
+        if pkg_config_binary is not None:
+            pkg_config = [
+                str(pkg_config_binary),
+            ]
+            if default_library == "static":
+                pkg_config += ["--static"]
+            if sdk_prefix is not None:
+                pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
+            binaries["pkg-config"] = strv_to_meson(pkg_config)
 
         if sdk_prefix is not None:
             config["built-in options"]["vala_args"] = strv_to_meson([
