@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import platform
 import shlex
+import shutil
 import subprocess
 import sys
 from typing import Any, Callable, List, Optional, Sequence
@@ -424,17 +425,22 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
         "encoding": "utf-8",
     }
 
-    subprocess.run(["git", "clone", "https://github.com/frida/vala.git"],
-                   cwd=workdir,
+    vala_checkout = workdir / "vala"
+    if vala_checkout.exists():
+        shutil.rmtree(vala_checkout)
+    subprocess.run(["git", "clone", "https://github.com/frida/vala.git", vala_checkout.name],
+                   cwd=vala_checkout.parent,
                    **run_kwargs)
+
     call_selected_meson([
                             "setup",
                             f"--prefix={toolchain_prefix}",
                             "-Doptimization=2",
                             "build",
                         ],
-                        cwd=workdir / "vala",
+                        cwd=vala_checkout,
                         **run_kwargs)
+
     call_selected_meson(["install"],
-                        cwd=workdir / "vala" / "build",
+                        cwd=vala_checkout / "build",
                         **run_kwargs)
