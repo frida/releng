@@ -174,7 +174,9 @@ def generate_machine_config(machine: MachineSpec,
                                              ("glib-genmarshal", ""),
                                              ("glib-mkenums", "")}:
             tool_path = toolchain_bindir / (tool_name + filename_suffix)
-            if tool_path.exists():
+            if not tool_path.exists():
+                tool_path = shutil.which(tool_name)
+            if tool_path is not None:
                 binaries[tool_name] = strv_to_meson([str(tool_path)])
 
         pkg_config_binary = toolchain_bindir / f"pkg-config{exe_suffix}"
