@@ -155,7 +155,7 @@ def configure(project_srcroot: Path,
         if project_depends_on_vala_compiler(project_srcroot):
             toolchain_prefix = env.query_toolchain_prefix(build_machine, deps_dir)
             try:
-                bootstrap_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
+                build_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
             except subprocess.CalledProcessError as e:
                 print(e, file=sys.stderr)
                 print("Output:\n\t| " + "\n\t| ".join(e.output.strip().split("\n")), file=sys.stderr)
@@ -412,8 +412,8 @@ def project_depends_on_vala_compiler(project_srcroot: Path) -> bool:
     return "'vala'" in (project_srcroot / "meson.build").read_text(encoding="utf-8")
 
 
-def bootstrap_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_meson: Callable):
-    print("Bootstrapping Vala compiler...", flush=True)
+def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_meson: Callable):
+    print("Building Vala compiler...", flush=True)
 
     workdir = deps_dir / "src"
     workdir.mkdir(parents=True, exist_ok=True)
