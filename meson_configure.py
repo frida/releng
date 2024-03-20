@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import platform
 import shlex
+import subprocess
 import sys
 from typing import Any, Callable, List, Optional, Sequence
 
@@ -121,6 +122,10 @@ def configure(project_srcroot: Path,
     if allowed_prebuilds is None:
         allowed_prebuilds = set(query_supported_bundle_types(include_wildcards=False))
 
+    call_selected_meson = lambda argv, *args, **kwargs: env.call_meson(argv,
+                                                                       use_submodule=meson == "internal",
+                                                                       *args, **kwargs)
+
     meson_options = [
         f"--prefix={prefix}",
         f"--default-library={default_library}",
@@ -146,9 +151,19 @@ def configure(project_srcroot: Path,
         except Exception as e:
             print_toolchain_unknown_error(e)
             return 2
-        extra_paths += [toolchain_prefix / "bin"]
     else:
-        toolchain_prefix = None
+        if project_depends_on_vala_compiler(project_srcroot):
+            toolchain_prefix = env.query_toolchain_prefix(build_machine, deps_dir)
+            try:
+                bootstrap_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
+            except subprocess.CalledProcessError as e:
+                print(e, file=sys.stderr)
+                print("Output:\n\t| " + "\n\t| ".join(e.output.strip().split("\n")), file=sys.stderr)
+                return 70
+        else:
+            toolchain_prefix = None
+    if toolchain_prefix is not None:
+        extra_paths += [toolchain_prefix / "bin"]
 
     is_cross_build = host_machine != build_machine
 
@@ -177,9 +192,6 @@ def configure(project_srcroot: Path,
             print_sdk_unknown_error(e)
             return 6
 
-    call_selected_meson = lambda argv, *args, **kwargs: env.call_meson(argv,
-                                                                       use_submodule=meson == "internal",
-                                                                       *args, **kwargs)
     try:
         native_file, cross_file, machine_paths, machine_env = \
                 env.generate_machine_files(build_machine, build_sdk_prefix,
@@ -394,3 +406,35 @@ def parse_array_option_value(v: str, opt: UserArrayOption) -> List[str]:
             raise argparse.ArgumentTypeError(f"invalid array value: '{v}' (choose from '{pretty_choices}')")
 
     return vals
+
+
+def project_depends_on_vala_compiler(project_srcroot: Path) -> bool:
+    return "'vala'" in (project_srcroot / "meson.build").read_text(encoding="utf-8")
+
+
+def bootstrap_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_meson: Callable):
+    print("Bootstrapping Vala compiler...", flush=True)
+
+    workdir = deps_dir / "src"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    run_kwargs = {
+        "check": True,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.STDOUT,
+        "encoding": "utf-8",
+    }
+
+    subprocess.run(["git", "clone", "https://github.com/frida/vala.git"],
+                   cwd=workdir,
+                   **run_kwargs)
+    call_selected_meson([
+                            "setup",
+                            f"--prefix={toolchain_prefix}",
+                            "build",
+                        ],
+                        cwd=workdir / "vala",
+                        **run_kwargs)
+    call_selected_meson(["install"],
+                        cwd=workdir / "vala" / "build",
+                        **run_kwargs)
