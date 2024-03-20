@@ -53,7 +53,7 @@ APPLE_BINARIES = [
 
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
-                        native_machine: MachineSpec,
+                        build_machine: MachineSpec,
                         is_cross_build: bool,
                         call_selected_meson: Callable,
                         config: ConfigParser):

@@ -55,7 +55,7 @@ class CompilerApplication:
         self.library_filename = compute_library_filename(self.kit, self.compiler_argument_syntax)
         if self.compiler_argument_syntax == "msvc" and self.meson_config is None:
             menv = {**os.environ}
-            runtime_dirs = [str(d) for d in winenv.detect_msvs_runtime_path(self.machine, env.detect_native_machine())]
+            runtime_dirs = [str(d) for d in winenv.detect_msvs_runtime_path(self.machine, env.detect_machine())]
             menv["PATH"] = os.pathsep.join(runtime_dirs) + os.pathsep + menv["PATH"]
             self.msvc_env = menv
 

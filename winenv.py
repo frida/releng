@@ -84,9 +84,9 @@ def detect_msvs_tool_path(machine, tool):
         return Path(detect_msvc_tool_dir()) / "bin" / "HostX86" / "x86" / tool
 
 
-def detect_msvs_runtime_path(machine, native_machine):
+def detect_msvs_runtime_path(machine, build_machine):
     msvc_platform = msvc_platform_from_arch(machine.arch)
-    native_msvc_platform = msvc_platform_from_arch(native_machine.arch)
+    native_msvc_platform = msvc_platform_from_arch(build_machine.arch)
 
     msvc_dir = detect_msvc_tool_dir()
     msvc_bindir = msvc_dir / "bin" / ("Host" + native_msvc_platform) / msvc_platform

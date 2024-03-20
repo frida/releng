@@ -105,10 +105,10 @@ def configure(project_srcroot: Path,
               meson: str = "internal",
               extra_meson_options: List[str] = []):
     if prefix is None:
-        prefix = env.detect_native_default_prefix()
+        prefix = env.detect_default_prefix()
 
     if build_machine is None:
-        build_machine = env.detect_native_machine()
+        build_machine = env.detect_machine()
 
     if host_machine is None:
         host_machine = build_machine

@@ -58,7 +58,7 @@ class NdkVersionError(Exception):
 
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
-                        native_machine: MachineSpec,
+                        build_machine: MachineSpec,
                         is_cross_build: bool,
                         call_selected_meson: Callable,
                         config: ConfigParser):
@@ -86,15 +86,15 @@ def init_machine_config(machine: MachineSpec,
         if major_version != NDK_REQUIRED:
             raise NdkVersionError(f"NDK r{NDK_REQUIRED} is required (found r{major_version}, which is unsupported)")
 
-    android_build_os = "darwin" if native_machine.os == "macos" else native_machine.os
-    android_build_arch = "x86_64" if native_machine.os in {"macos", "linux"} else native_machine.arch
+    android_build_os = "darwin" if build_machine.os == "macos" else build_machine.os
+    android_build_arch = "x86_64" if build_machine.os in {"macos", "linux"} else build_machine.arch
     android_api = 19 if machine.arch in {"x86", "arm"} else 21
 
     llvm_bindir = ndk_root / "toolchains" / "llvm" / "prebuilt" / f"{android_build_os}-{android_build_arch}" / "bin"
 
     binaries = config["binaries"]
     for (identifier, tool_name, *rest) in NDK_BINARIES:
-        path = llvm_bindir / f"{tool_name}{native_machine.executable_suffix}"
+        path = llvm_bindir / f"{tool_name}{build_machine.executable_suffix}"
 
         argv = [str(path)]
         if len(rest) != 0:

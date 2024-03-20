@@ -156,7 +156,7 @@ class LinkerDetectionError(Exception):
 
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
-                        native_machine: MachineSpec,
+                        build_machine: MachineSpec,
                         is_cross_build: bool,
                         call_selected_meson: Callable,
                         config: ConfigParser):
@@ -199,10 +199,10 @@ def init_machine_config(machine: MachineSpec,
             argv = [
                 "env2mfile",
                 "-o", machine_file,
-                "--native" if machine == native_machine else "--cross",
+                "--native" if machine == build_machine else "--cross",
             ]
 
-            if machine != native_machine:
+            if machine != build_machine:
                 argv += [
                     "--system", machine.system,
                     "--subsystem", machine.subsystem,
@@ -213,7 +213,7 @@ def init_machine_config(machine: MachineSpec,
                 ]
 
             meson_env = {**os.environ}
-            if is_cross_build and machine == native_machine:
+            if is_cross_build and machine == build_machine:
                 meson_env = {build_envvar_to_host(k): v for k, v in meson_env.items() if k not in TOOLCHAIN_ENVVARS}
 
             process = call_selected_meson(argv,
@@ -277,7 +277,7 @@ def init_machine_config(machine: MachineSpec,
                 "Platform": winenv.msvc_platform_from_arch(machine.arch),
             })
 
-            machine_path += winenv.detect_msvs_runtime_path(machine, native_machine)
+            machine_path += winenv.detect_msvs_runtime_path(machine, build_machine)
         else:
             suffix = ":\n" + diagnostics if diagnostics is not None else ""
             raise CompilerNotFoundError("no C compiler found" + suffix)

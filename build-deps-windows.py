@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # TODO: Refactor
     sys.path.insert(0, str(ROOT_DIR))
 
-from releng.env import detect_native_machine
+from releng.env import detect_machine
 from releng.deps import read_dependency_parameters, Bundle, DependencyParameters, PackageSpec
 from releng.machine_spec import MachineSpec
 from releng import winenv
@@ -154,7 +154,7 @@ cached_meson_params = {}
 cached_target_glib = None
 cached_bootstrap_valac = None
 
-native_machine = detect_native_machine()
+build_machine = detect_machine()
 
 
 def main():
@@ -431,7 +431,7 @@ def generate_meson_env(arch: str, config: str, runtime: str) -> MesonEnv:
         prefix / "bin",
         env_dir,
         BOOTSTRAP_TOOLCHAIN_DIR / "bin",
-    ] + winenv.detect_msvs_runtime_path(machine, native_machine)])
+    ] + winenv.detect_msvs_runtime_path(machine, build_machine)])
 
     include_path = ";".join([str(path) for path in winenv.detect_msvs_include_path()])
 

@@ -39,27 +39,27 @@ def enumerate_build_dirs(build_dir: Path):
     return build_dir.glob("tmp-*/*")
 
 
-def detect_native_machine() -> MachineSpec:
-    nos = detect_native_os()
-    config = "release" if nos == "windows" else None
-    return MachineSpec(nos, detect_native_arch(), config)
+def detect_machine() -> MachineSpec:
+    bos = detect_os()
+    config = "release" if bos == "windows" else None
+    return MachineSpec(bos, detect_arch(), config)
 
 
-def detect_native_os() -> str:
-    nos = platform.system().lower()
-    if nos == "darwin":
-        nos = "macos"
-    return nos
+def detect_os() -> str:
+    bos = platform.system().lower()
+    if bos == "darwin":
+        bos = "macos"
+    return bos
 
 
-def detect_native_arch() -> str:
+def detect_arch() -> str:
     arch = platform.machine().lower()
     if arch == "amd64":
         arch = "x86_64"
     return arch
 
 
-def detect_native_default_prefix() -> Path:
+def detect_default_prefix() -> Path:
     if platform.system() == "Windows":
         return Path(os.environ["ProgramFiles"]) / "Frida"
     return Path("/usr/local")
@@ -124,7 +124,7 @@ def write_machine_file(machine: MachineSpec,
 
 def generate_machine_config(machine: MachineSpec,
                             sdk_prefix: Optional[Path],
-                            native_machine: MachineSpec,
+                            build_machine: MachineSpec,
                             is_cross_build: bool,
                             toolchain_prefix: Optional[Path],
                             default_library: DefaultLibrary,
@@ -152,7 +152,7 @@ def generate_machine_config(machine: MachineSpec,
 
     machine_path, machine_env = impl.init_machine_config(machine,
                                                          sdk_prefix,
-                                                         native_machine,
+                                                         build_machine,
                                                          is_cross_build,
                                                          call_selected_meson,
                                                          config)
@@ -161,7 +161,7 @@ def generate_machine_config(machine: MachineSpec,
         binaries = config["binaries"]
 
         toolchain_bindir = toolchain_prefix / "bin"
-        exe_suffix = native_machine.executable_suffix
+        exe_suffix = build_machine.executable_suffix
 
         for (tool_name, filename_suffix) in {("gdbus-codegen", ""),
                                              ("gio-querymodules", exe_suffix),
@@ -188,7 +188,7 @@ def generate_machine_config(machine: MachineSpec,
                 pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
             binaries["pkg-config"] = strv_to_meson(pkg_config)
 
-        vala_compiler = detect_toolchain_vala_compiler(toolchain_prefix, native_machine)
+        vala_compiler = detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
         if vala_compiler is not None:
             valac, vapidir = vala_compiler
             binaries["vala"] = strv_to_meson([
@@ -223,14 +223,14 @@ def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
 
 
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
-                                   native_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
+                                   build_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
     datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
     if datadir is None:
         return None
 
     api_version = datadir.name.split("-", maxsplit=1)[1]
 
-    valac = toolchain_prefix / "bin" / f"valac-{api_version}{native_machine.executable_suffix}"
+    valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
     vapidir = datadir / "vapi"
     return (valac, vapidir)
 
