@@ -428,7 +428,7 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
     vala_checkout = workdir / "vala"
     if vala_checkout.exists():
         shutil.rmtree(vala_checkout)
-    subprocess.run(["git", "clone", "https://github.com/frida/vala.git", vala_checkout.name],
+    subprocess.run(["git", "clone", "--depth", "1", "https://github.com/frida/vala.git", vala_checkout.name],
                    cwd=vala_checkout.parent,
                    **run_kwargs)
 
