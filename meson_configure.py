@@ -431,6 +431,7 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
     call_selected_meson([
                             "setup",
                             f"--prefix={toolchain_prefix}",
+                            "-Doptimization=2",
                             "build",
                         ],
                         cwd=workdir / "vala",
