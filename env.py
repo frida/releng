@@ -190,6 +190,14 @@ def generate_machine_config(machine: MachineSpec,
                 pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
             binaries["pkg-config"] = strv_to_meson(pkg_config)
 
+        valac_datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
+        if valac_datadir is not None:
+            vala_api_version = valac_datadir.name.split("-", maxsplit=1)[1]
+            binaries["vala"] = strv_to_meson([
+                str(toolchain_bindir / f"valac-{vala_api_version}{exe_suffix}"),
+                "--vapidir=" + str(valac_datadir / "vapi"),
+            ])
+
         if sdk_prefix is not None:
             config["built-in options"]["vala_args"] = strv_to_meson([
                 "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
