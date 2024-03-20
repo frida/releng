@@ -5,6 +5,7 @@ from pathlib import Path
 import shlex
 import shutil
 import sys
+from typing import List
 
 from . import env
 from .meson_configure import configure
@@ -33,7 +34,7 @@ def main():
     sys.exit(exit_status)
 
 
-def make(project_srcroot, build_dir, targets):
+def make(project_srcroot: Path, build_dir: Path, targets: List[str]):
     if not (build_dir / "build.ninja").exists():
         exit_status = configure(project_srcroot, build_dir)
         if exit_status != 0:
@@ -107,7 +108,7 @@ def make(project_srcroot, build_dir, targets):
     return exit_status
 
 
-def distclean(project_srcroot, build_dir):
+def distclean(project_srcroot: Path, build_dir: Path):
     items_to_delete = []
 
     if not build_dir.is_relative_to(project_srcroot):
