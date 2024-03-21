@@ -56,9 +56,10 @@ def main():
                 flavor = "_thin"
 
         meson_config = env.load_meson_config(machine, flavor, build_dir)
+        assert meson_config is not None
 
     try:
-        app = devkit.CompilerApplication(kit, machine, flavor, meson_config, outdir)
+        app = devkit.CompilerApplication(kit, machine, meson_config, outdir)
         app.run()
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)

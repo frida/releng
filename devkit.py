@@ -1,24 +1,19 @@
 from collections import OrderedDict
-from glob import glob
+import itertools
 import os
 from pathlib import Path
-import platform
 import re
 import shlex
 import shutil
 import subprocess
 import tempfile
-from typing import Optional, Mapping, Sequence, Union
-from xml.etree import ElementTree
-from xml.etree.ElementTree import QName
+from typing import Mapping, Sequence, Union
 
-from . import env, winenv
+from . import env
 from .machine_spec import MachineSpec
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-INCLUDE_PATTERN = re.compile(r"#include\s+[<\"](.*?)[>\"]")
 
 DEVKITS = {
     "frida-gum": ("frida-gum-1.0", Path("gum") / "gum.h"),
@@ -26,13 +21,16 @@ DEVKITS = {
     "frida-core": ("frida-core-1.0", Path("frida-core.h")),
 }
 
+ASSETS_PATH = Path(__file__).parent / "devkit-assets"
+
+INCLUDE_PATTERN = re.compile(r"#include\s+[<\"](.*?)[>\"]")
+
 
 class CompilerApplication:
     def __init__(self,
                  kit: str,
                  machine: MachineSpec,
-                 flavor: str,
-                 meson_config: Optional[Mapping[str, Union[str, Sequence[str]]]],
+                 meson_config: Mapping[str, Union[str, Sequence[str]]],
                  output_dir: Path):
         self.kit = kit
         package, umbrella_header = DEVKITS[kit]
@@ -40,12 +38,10 @@ class CompilerApplication:
         self.umbrella_header = umbrella_header
 
         self.machine = machine
-        self.flavor = flavor
         self.meson_config = meson_config
         self.compiler_argument_syntax = None
         self.output_dir = output_dir
         self.library_filename = None
-        self.msvc_env = None
 
     def run(self):
         output_dir = self.output_dir
@@ -53,11 +49,6 @@ class CompilerApplication:
 
         self.compiler_argument_syntax = detect_compiler_argument_syntax(self.meson_config)
         self.library_filename = compute_library_filename(self.kit, self.compiler_argument_syntax)
-        if self.compiler_argument_syntax == "msvc" and self.meson_config is None:
-            menv = {**os.environ}
-            runtime_dirs = [str(d) for d in winenv.detect_msvs_runtime_path(self.machine, env.detect_machine())]
-            menv["PATH"] = os.pathsep.join(runtime_dirs) + os.pathsep + menv["PATH"]
-            self.msvc_env = menv
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -83,9 +74,9 @@ class CompilerApplication:
         extra_files += self._generate_gir()
 
         if self.compiler_argument_syntax == "msvc":
-            for msvs_asset in glob(str(asset_path(f"{kit}-*.sln"))) + glob(str(asset_path(f"{kit}-*.vcxproj*"))):
+            for msvs_asset in itertools.chain(ASSETS_PATH.glob(f"{kit}-*.sln"), ASSETS_PATH.glob(f"{kit}-*.vcxproj*")):
                 shutil.copy(msvs_asset, output_dir)
-                extra_files.append(Path(msvs_asset).name)
+                extra_files.append(msvs_asset.name)
 
         return [header_file.name, self.library_filename, example_file.name] + extra_files
 
@@ -93,17 +84,7 @@ class CompilerApplication:
         if self.kit != "frida-core":
             return []
 
-        machine = self.machine
-        flavor = self.flavor
-        meson_config = self.meson_config
-
-        if meson_config is not None:
-            gir_path = Path(query_pkgconfig_variable("frida_girdir", self.package, meson_config)) / "Frida-1.0.gir"
-        else:
-            assert machine.os == "windows"
-            assert self.compiler_argument_syntax == "msvc"
-            gir_path = REPO_ROOT / "build" / f"tmp{flavor}-windows" / msvs_arch_config(machine) / "frida-core" / "Frida-1.0.gir"
-
+        gir_path = Path(query_pkgconfig_variable("frida_girdir", self.package, self.meson_config)) / "Frida-1.0.gir"
         gir_name = "frida-core.gir"
 
         shutil.copy(gir_path, self.output_dir / gir_name)
@@ -116,21 +97,12 @@ class CompilerApplication:
         machine = self.machine
         meson_config = self.meson_config
 
-        c_args = meson_config.get("c_args", []) if meson_config is not None else []
+        c_args = meson_config.get("c_args", [])
 
-        if meson_config is not None:
-            include_cflags = query_pkgconfig_cflags(package, meson_config)
-        else:
-            include_cflags = compute_custom_include_cflags(machine)
+        include_cflags = query_pkgconfig_cflags(package, meson_config)
 
         if self.compiler_argument_syntax == "msvc":
-            if meson_config is not None:
-                cl_cmd = meson_config["c"]
-            else:
-                cl_cmd = [winenv.detect_msvs_tool_path(machine, "cl.exe")]
-
-            preprocessor = subprocess.run(cl_cmd + c_args + ["/nologo", "/E", umbrella_header_path] + include_cflags,
-                                          env=self.msvc_env,
+            preprocessor = subprocess.run(meson_config["c"] + c_args + ["/nologo", "/E", umbrella_header_path] + include_cflags,
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.PIPE,
                                           encoding="utf-8")
@@ -206,17 +178,12 @@ class CompilerApplication:
         return (config + devkit_header).replace("\r\n", "\n")
 
     def _generate_library(self):
-        meson_config = self.meson_config
+        library_flags = call_pkgconfig(["--static", "--libs", self.package], self.meson_config).split(" ")
 
-        if meson_config is not None:
-            library_flags = call_pkgconfig(["--static", "--libs", self.package], meson_config).split(" ")
-
-            library_dirs = infer_library_dirs(library_flags)
-            library_names = infer_library_names(library_flags)
-            library_paths, extra_flags = resolve_library_paths(library_names, library_dirs, self.machine)
-            extra_flags += infer_linker_flags(library_flags)
-        else:
-            (library_paths, extra_flags) = compute_custom_library_paths_and_flags(self.package, self.machine)
+        library_dirs = infer_library_dirs(library_flags)
+        library_names = infer_library_names(library_flags)
+        library_paths, extra_flags = resolve_library_paths(library_names, library_dirs, self.machine)
+        extra_flags += infer_linker_flags(library_flags)
 
         if self.compiler_argument_syntax == "msvc":
             thirdparty_symbol_mappings = self._do_generate_library_msvc(library_paths)
@@ -226,16 +193,7 @@ class CompilerApplication:
         return (extra_flags, thirdparty_symbol_mappings)
 
     def _do_generate_library_msvc(self, library_paths):
-        meson_config = self.meson_config
-
-        lib_cmd = None
-        if meson_config is not None:
-            lib_cmd = meson_config.get("lib", None)
-        if lib_cmd is None:
-            lib_cmd = [winenv.detect_msvs_tool_path(self.machine, "lib.exe")]
-
-        subprocess.run(lib_cmd + ["/nologo", "/out:" + str(self.output_dir / self.library_filename)] + library_paths,
-                       env=self.msvc_env,
+        subprocess.run(self.meson_config["lib"] + ["/nologo", "/out:" + str(self.output_dir / self.library_filename)] + library_paths,
                        capture_output=True,
                        encoding="utf-8",
                        check=True)
@@ -251,7 +209,7 @@ class CompilerApplication:
         v8_libs = [path for path in library_paths if path.name.startswith("libv8")]
         if len(v8_libs) > 0:
             v8_libdir = v8_libs[0].parent
-            libcxx_libs = [Path(p) for p in glob(str(v8_libdir / "c++" / "*.a"))]
+            libcxx_libs = list((v8_libdir / "c++").glob("*.a"))
             library_paths.extend(libcxx_libs)
 
         meson_config = self.meson_config
@@ -324,7 +282,7 @@ class CompilerApplication:
 
         os_flavor = "windows" if machine.os == "windows" else "unix"
 
-        example_code = asset_path(f"{kit}-example-{os_flavor}.c").read_text(encoding="utf-8")
+        example_code = (ASSETS_PATH / f"{kit}-example-{os_flavor}.c").read_text(encoding="utf-8")
 
         if machine.os == "windows":
             return example_code
@@ -419,10 +377,6 @@ def get_symbols(library, meson_config):
     return result
 
 
-def compute_include_cflags(incdirs):
-    return ["/I" + str(incdir) for incdir in incdirs]
-
-
 def infer_include_dirs(flags):
     return [Path(flag[2:]) for flag in flags if flag.startswith("-I")]
 
@@ -462,10 +416,6 @@ def is_os_library(path, machine):
     return False
 
 
-def asset_path(name):
-    return Path(__file__).parent / "devkit-assets" / name
-
-
 def query_pkgconfig_cflags(package, meson_config):
     raw_flags = call_pkgconfig(["--cflags", package], meson_config)
     return shlex.split(raw_flags)
@@ -488,29 +438,12 @@ def call_pkgconfig(argv, meson_config):
 
 
 def detect_compiler_argument_syntax(meson_config):
-    if meson_config is None:
-        return "msvc"
-
     if subprocess.run(meson_config["c"],
                       capture_output=True,
                       encoding="utf-8").stderr.startswith("Microsoft "):
         return "msvc"
 
     return "unix"
-
-
-def msvs_arch_config(machine):
-    if machine.arch == "x86_64":
-        return "x64-Release"
-    else:
-        return "Win32-Release"
-
-
-def msvs_arch_suffix(machine):
-    if machine.arch == "x86_64":
-        return "-64"
-    else:
-        return "-32"
 
 
 def compute_library_filename(kit, compiler_argument_syntax):
@@ -521,40 +454,11 @@ def compute_library_filename(kit, compiler_argument_syntax):
 
 
 def compute_umbrella_header_path(machine, package, umbrella_header, meson_config):
-    if meson_config is not None:
-        for incdir in infer_include_dirs(query_pkgconfig_cflags(package, meson_config)):
-            candidate = (incdir / umbrella_header)
-            if candidate.exists():
-                return candidate
-        raise Exception(f"Unable to resolve umbrella header path for {umbrella_header}")
-
-    assert machine.os == "windows"
-
-    if package == "frida-gum-1.0":
-        return REPO_ROOT / "frida-gum" / "gum" / "gum.h"
-    elif package == "frida-gumjs-1.0":
-        return REPO_ROOT / "frida-gum" / "bindings" / "gumjs" / umbrella_header.name
-    elif package == "frida-core-1.0":
-        return REPO_ROOT / "build" / "tmp-windows" / msvs_arch_config(machine) / "frida-core" / "api" / "frida-core.h"
-    else:
-        raise Exception("Unhandled package")
-
-
-def sdk_lib_path(name, machine):
-    return REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "lib" / name
-
-
-def internal_include_path(name, machine):
-    return REPO_ROOT / "build" / "tmp-windows" / msvs_arch_config(machine) / (name + msvs_arch_suffix(machine))
-
-
-def internal_noarch_lib_path(name, machine):
-    return REPO_ROOT / "build" / "tmp-windows" / msvs_arch_config(machine) / name / f"{name}.lib"
-
-
-def internal_arch_lib_path(name, machine):
-    lib_name = name + msvs_arch_suffix(machine)
-    return REPO_ROOT / "build" / "tmp-windows" / msvs_arch_config(machine) / lib_name / f"{lib_name}.lib"
+    for incdir in infer_include_dirs(query_pkgconfig_cflags(package, meson_config)):
+        candidate = (incdir / umbrella_header)
+        if candidate.exists():
+            return candidate
+    raise Exception(f"Unable to resolve umbrella header path for {umbrella_header}")
 
 
 def tweak_flags(cflags, ldflags):
@@ -629,171 +533,3 @@ def tweak_flags(cflags, ldflags):
 
 def deduplicate(items):
     return list(OrderedDict.fromkeys(items))
-
-
-def compute_custom_include_cflags(machine):
-    assert machine.os == "windows"
-
-    incdirs = [
-        REPO_ROOT / "frida-gum" / "bindings",
-        REPO_ROOT / "frida-gum",
-        internal_include_path("gum", machine),
-        REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "include" / "capstone",
-        REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "include" / "json-glib-1.0",
-        REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "lib" / "glib-2.0" / "include",
-        REPO_ROOT / "build" / "sdk-windows" / msvs_arch_config(machine) / "include" / "glib-2.0",
-    ] + winenv.detect_msvs_include_path()
-
-    return ["/I" + str(incdir) for incdir in incdirs]
-
-
-def compute_custom_library_paths_and_flags(package, machine):
-    assert machine.os == "windows"
-
-    pcre2 = [
-        sdk_lib_path("libpcre2-8.a", machine),
-    ]
-    libffi = [
-        sdk_lib_path("libffi.a", machine),
-    ]
-    zlib = [
-        sdk_lib_path("libz.a", machine),
-    ]
-    libbrotlidec = [
-        sdk_lib_path("libbrotlicommon.a", machine),
-        sdk_lib_path("libbrotlidec.a", machine),
-    ]
-
-    glib = pcre2 + [
-        sdk_lib_path("libglib-2.0.a", machine),
-    ]
-    gobject = glib + libffi + [
-        sdk_lib_path("libgobject-2.0.a", machine),
-    ]
-    gmodule = glib + [
-        sdk_lib_path("libgmodule-2.0.a", machine),
-    ]
-    gio = glib + gobject + gmodule + zlib + [
-        sdk_lib_path("libgio-2.0.a", machine),
-    ]
-
-    openssl = [
-        sdk_lib_path("libssl.a", machine),
-        sdk_lib_path("libcrypto.a", machine),
-    ]
-
-    tls_provider = openssl + [
-        sdk_lib_path(Path("gio") / "modules" / "libgioopenssl.a", machine),
-    ]
-
-    nice = [
-        sdk_lib_path("libnice.a", machine),
-    ]
-
-    lwip = [
-        sdk_lib_path("liblwip.a", machine),
-    ]
-
-    usrsctp = [
-        sdk_lib_path("libusrsctp.a", machine),
-    ]
-
-    json_glib = glib + gobject + [
-        sdk_lib_path("libjson-glib-1.0.a", machine),
-    ]
-
-    gee = glib + gobject + [
-        sdk_lib_path("libgee-0.8.a", machine),
-    ]
-
-    ngtcp2 = [
-        sdk_lib_path("libngtcp2.a", machine),
-        sdk_lib_path("libngtcp2_crypto_quictls.a", machine),
-    ]
-
-    nghttp2 = [
-        sdk_lib_path("libnghttp2.a", machine),
-    ]
-
-    sqlite = [
-        sdk_lib_path("libsqlite3.a", machine),
-    ]
-
-    libpsl = [
-        sdk_lib_path("libpsl.a", machine),
-    ]
-
-    libsoup = nghttp2 + sqlite + libbrotlidec + libpsl + [
-        sdk_lib_path("libsoup-3.0.a", machine),
-    ]
-
-    capstone = [
-        sdk_lib_path("libcapstone.a", machine)
-    ]
-
-    quickjs = [
-        sdk_lib_path("libquickjs.a", machine)
-    ]
-
-    tinycc = [
-        sdk_lib_path("libtcc.a", machine)
-    ]
-
-    v8 = []
-
-    build_props = ElementTree.parse(REPO_ROOT / "releng" / "frida.props")
-    frida_v8_tag = str(QName("http://schemas.microsoft.com/developer/msbuild/2003", "FridaV8"))
-
-    for elem in build_props.iter():
-        if elem.tag == frida_v8_tag:
-            if elem.text == "Enabled":
-                v8 += [
-                    sdk_lib_path("libv8-10.0.a", machine),
-                ]
-            break
-
-    gum_lib = internal_arch_lib_path("gum", machine)
-    gum_deps = deduplicate(glib + gobject + capstone)
-    gum = [gum_lib] + gum_deps
-
-    gumjs_lib = internal_arch_lib_path("gumjs", machine)
-    gumjs_deps = deduplicate(gum + quickjs + v8 + gio + tls_provider + json_glib + tinycc + sqlite)
-    gumjs = [gumjs_lib] + gumjs_deps
-
-    gumjs_inspector_lib = internal_noarch_lib_path("gumjs-inspector", machine)
-    gumjs_inspector_deps = deduplicate(gum + json_glib + libsoup)
-    gumjs_inspector = [gumjs_inspector_lib] + gumjs_inspector_deps
-
-    frida_core_lib = internal_noarch_lib_path("frida-core", machine)
-    frida_core_deps = deduplicate(glib
-                                  + gobject
-                                  + gio
-                                  + tls_provider
-                                  + ngtcp2
-                                  + lwip
-                                  + nice
-                                  + openssl
-                                  + usrsctp
-                                  + json_glib
-                                  + gmodule
-                                  + gee
-                                  + libsoup
-                                  + gum
-                                  + gumjs_inspector
-                                  + libbrotlidec
-                                  + capstone
-                                  + quickjs)
-    frida_core = [frida_core_lib] + frida_core_deps
-
-    if package == "frida-gum-1.0":
-        library_paths = gum
-    elif package == "frida-gumjs-1.0":
-        library_paths = gumjs
-    elif package == "frida-core-1.0":
-        library_paths = frida_core
-    else:
-        raise Exception("Unhandled package")
-
-    extra_flags = [lib_path.name for lib_path in library_paths]
-
-    return (library_paths, extra_flags)
