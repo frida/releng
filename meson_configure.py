@@ -18,7 +18,15 @@ from . import deps, env, machine_spec
 
 
 def main():
-    project_srcroot = Path(sys.argv.pop(1)).resolve()
+    default_sourcedir = Path(sys.argv.pop(1))
+    sourcedir = Path(os.environ.get("FRIDA_SOURCEDIR", default_sourcedir)).resolve()
+
+    workdir = Path(os.getcwd())
+    if workdir.is_relative_to(sourcedir):
+        default_builddir = sourcedir / "build"
+    else:
+        default_builddir = workdir
+    builddir = Path(os.environ.get("FRIDA_BUILDDIR", default_builddir)).resolve()
 
     parser = argparse.ArgumentParser(prog="configure",
                                      add_help=False)
@@ -58,23 +66,18 @@ def main():
                       nargs="*",
                       help=argparse.SUPPRESS)
 
-    meson_options_file = project_srcroot / "meson.options"
+    meson_options_file = sourcedir / "meson.options"
     if not meson_options_file.exists():
-        meson_options_file = project_srcroot / "meson_options.txt"
+        meson_options_file = sourcedir / "meson_options.txt"
     if meson_options_file.exists():
         meson_group = parser.add_argument_group(title="project-specific options")
         meson_opts = register_meson_options(meson_options_file, meson_group)
 
     options = parser.parse_args()
 
-    work_dir = Path(os.getcwd())
-    if work_dir.is_relative_to(project_srcroot):
-        build_dir = project_srcroot / "build"
-    else:
-        build_dir = work_dir
-    if build_dir.exists():
-        if (build_dir / "build.ninja").exists():
-            print(f"Already configured. Wipe .{os.sep}{build_dir.relative_to(work_dir)} to reconfigure.",
+    if builddir.exists():
+        if (builddir / "build.ninja").exists():
+            print(f"Already configured. Wipe .{os.sep}{builddir.relative_to(workdir)} to reconfigure.",
                   file=sys.stderr)
             sys.exit(1)
 
@@ -82,8 +85,8 @@ def main():
 
     allowed_prebuilds = set(query_supported_bundle_types(include_wildcards=False)) - options.without_prebuilds
 
-    exit_status = configure(project_srcroot,
-                            build_dir,
+    exit_status = configure(sourcedir,
+                            builddir,
                             options.prefix,
                             options.build,
                             options.host,
@@ -95,8 +98,8 @@ def main():
     sys.exit(exit_status)
 
 
-def configure(project_srcroot: Path,
-              build_dir: Path,
+def configure(sourcedir: Path,
+              builddir: Path,
               prefix: Optional[str] = None,
               build_machine: Optional[machine_spec.MachineSpec] = None,
               host_machine: Optional[machine_spec.MachineSpec] = None,
@@ -139,7 +142,7 @@ def configure(project_srcroot: Path,
     if raw_deps_dir is not None:
         deps_dir = Path(raw_deps_dir)
     else:
-        deps_dir = project_srcroot / "deps"
+        deps_dir = sourcedir / "deps"
 
     allow_prebuilt_toolchain = "toolchain" in allowed_prebuilds
     if allow_prebuilt_toolchain:
@@ -152,7 +155,7 @@ def configure(project_srcroot: Path,
             print_toolchain_unknown_error(e)
             return 2
     else:
-        if project_depends_on_vala_compiler(project_srcroot):
+        if project_depends_on_vala_compiler(sourcedir):
             toolchain_prefix = env.query_toolchain_prefix(build_machine, deps_dir)
             vala_compiler = env.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
             if vala_compiler is None:
@@ -199,7 +202,7 @@ def configure(project_srcroot: Path,
                 env.generate_machine_files(build_machine, build_sdk_prefix,
                                            host_machine, host_sdk_prefix,
                                            toolchain_prefix, default_library,
-                                           call_selected_meson, build_dir)
+                                           call_selected_meson, builddir)
     except Exception as e:
         print(f"Unable to generate machine files: {e}", file=sys.stderr)
         return 7
@@ -213,31 +216,31 @@ def configure(project_srcroot: Path,
     meson_env = {**os.environ, **machine_env}
     meson_env["PATH"] = os.pathsep.join(raw_extra_paths) + os.pathsep + meson_env["PATH"]
 
-    process = call_selected_meson(["setup"] + meson_options + extra_meson_options + [build_dir],
-                                  cwd=project_srcroot,
+    process = call_selected_meson(["setup"] + meson_options + extra_meson_options + [builddir],
+                                  cwd=sourcedir,
                                   env=meson_env)
 
-    makefile_path = build_dir / "Makefile"
+    makefile_path = builddir / "Makefile"
     if not makefile_path.exists():
-        in_tree = (project_srcroot / "Makefile").read_text(encoding="utf-8")
+        in_tree = (sourcedir / "Makefile").read_text(encoding="utf-8")
         out_of_tree = in_tree \
-                .replace('"$(shell pwd)"', shlex.quote(str(project_srcroot))) \
+                .replace('"$(shell pwd)"', shlex.quote(str(sourcedir))) \
                 .replace('./build', ".")
         makefile_path.write_text(out_of_tree)
 
         if platform.system() == "Windows":
-            in_tree = (project_srcroot / "make.bat").read_text(encoding="utf-8")
+            in_tree = (sourcedir / "make.bat").read_text(encoding="utf-8")
             out_of_tree = in_tree \
-                    .replace('"%dp0%"', '"' + str(project_srcroot) + '"') \
+                    .replace('"%dp0%"', '"' + str(sourcedir) + '"') \
                     .replace('.\\build', ".")
-            (build_dir / "make.bat").write_text(out_of_tree)
+            (builddir / "make.bat").write_text(out_of_tree)
 
     env_config = {
         "meson": meson,
         "paths": raw_extra_paths,
         "env": machine_env,
     }
-    (build_dir / "frida-env-config.json").write_text(json.dumps(env_config, indent=2), encoding="utf-8")
+    (builddir / "frida-env-config.json").write_text(json.dumps(env_config, indent=2), encoding="utf-8")
 
     return process.returncode
 
@@ -410,8 +413,8 @@ def parse_array_option_value(v: str, opt: UserArrayOption) -> List[str]:
     return vals
 
 
-def project_depends_on_vala_compiler(project_srcroot: Path) -> bool:
-    return "'vala'" in (project_srcroot / "meson.build").read_text(encoding="utf-8")
+def project_depends_on_vala_compiler(sourcedir: Path) -> bool:
+    return "'vala'" in (sourcedir / "meson.build").read_text(encoding="utf-8")
 
 
 def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_meson: Callable):
