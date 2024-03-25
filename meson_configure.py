@@ -131,8 +131,8 @@ def configure(sourcedir: Path,
                                                                        *args, **kwargs)
 
     meson_options = [
-        f"--prefix={prefix}",
-        f"--default-library={default_library}",
+        f"-Dprefix={prefix}",
+        f"-Ddefault_library={default_library}",
         "-Doptimization=s",
         "-Db_vscrt=mt",
     ]
@@ -380,7 +380,7 @@ def collect_meson_options(options: argparse.Namespace) -> List[str]:
     result = []
 
     if not options.enable_symbols:
-        result += ["--strip"]
+        result += ["-Dstrip=true"]
 
     for raw_name, raw_val in vars(options).items():
         if raw_val is None:
