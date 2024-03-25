@@ -6,7 +6,6 @@ from enum import Enum
 import json
 import os
 from pathlib import Path, PurePath
-import platform
 import shutil
 import subprocess
 import sys
