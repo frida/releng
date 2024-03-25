@@ -15,8 +15,11 @@ STANDARD_TARGET_NAMES = ["all", "clean", "distclean", "install", "test"]
 
 
 def main():
-    project_srcroot = Path(sys.argv.pop(1)).resolve()
-    build_dir = Path(sys.argv.pop(1)).resolve()
+    default_sourcedir = Path(sys.argv.pop(1)).resolve()
+    sourcedir = Path(os.environ.get("FRIDA_SOURCEDIR", default_sourcedir)).resolve()
+
+    default_builddir = Path(sys.argv.pop(1)).resolve()
+    builddir = Path(os.environ.get("FRIDA_BUILDDIR", default_builddir)).resolve()
 
     parser = argparse.ArgumentParser(prog="make")
     parser.add_argument("targets",
@@ -29,18 +32,18 @@ def main():
     if isinstance(targets, str):
         targets = [targets]
 
-    exit_status = make(project_srcroot, build_dir, targets)
+    exit_status = make(sourcedir, builddir, targets)
 
     sys.exit(exit_status)
 
 
-def make(project_srcroot: Path, build_dir: Path, targets: List[str]):
-    if not (build_dir / "build.ninja").exists():
-        exit_status = configure(project_srcroot, build_dir)
+def make(sourcedir: Path, builddir: Path, targets: List[str]):
+    if not (builddir / "build.ninja").exists():
+        exit_status = configure(sourcedir, builddir)
         if exit_status != 0:
             return exit_status
 
-    env_config = json.loads((build_dir / "frida-env-config.json").read_text(encoding="utf-8"))
+    env_config = json.loads((builddir / "frida-env-config.json").read_text(encoding="utf-8"))
 
     meson_env = {**os.environ, **env_config["env"]}
     meson_env["PATH"] = os.pathsep.join(env_config["paths"]) + os.pathsep + meson_env["PATH"]
@@ -54,7 +57,7 @@ def make(project_srcroot: Path, build_dir: Path, targets: List[str]):
     standard_targets = {
         "all": ["compile"] + compile_options,
         "clean": ["compile", "--clean"] + compile_options,
-        "distclean": lambda: distclean(project_srcroot, build_dir),
+        "distclean": lambda: distclean(sourcedir, builddir),
         "install": ["install"],
         "test": ["test"] + test_options,
     }
@@ -62,7 +65,7 @@ def make(project_srcroot: Path, build_dir: Path, targets: List[str]):
     def do_meson_command(args):
         return env.call_meson(args,
                               use_submodule=env_config["meson"] == "internal",
-                              cwd=build_dir,
+                              cwd=builddir,
                               env=meson_env).returncode
 
     exit_status = 0
@@ -108,15 +111,15 @@ def make(project_srcroot: Path, build_dir: Path, targets: List[str]):
     return exit_status
 
 
-def distclean(project_srcroot: Path, build_dir: Path):
+def distclean(sourcedir: Path, builddir: Path):
     items_to_delete = []
 
-    if not build_dir.is_relative_to(project_srcroot):
-        items_to_delete += list(build_dir.iterdir())
+    if not builddir.is_relative_to(sourcedir):
+        items_to_delete += list(builddir.iterdir())
 
     items_to_delete += [
-        project_srcroot / "build",
-        project_srcroot / "deps",
+        sourcedir / "build",
+        sourcedir / "deps",
     ]
 
     for item in items_to_delete:
