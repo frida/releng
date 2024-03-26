@@ -4,7 +4,7 @@ import argparse
 from configparser import ConfigParser
 from pathlib import Path
 import sys
-from typing import Dict, List, Union
+from typing import Dict, List, Sequence, Union
 
 
 class CommandError(Exception):
@@ -94,11 +94,11 @@ def load(mfile: Path) -> Dict[str, Union[str, List[str]]]:
     return items
 
 
-def strv_to_meson(strv):
+def strv_to_meson(strv: Sequence[str]) -> str:
     return "[" + ", ".join(map(str_to_meson, strv)) + "]"
 
 
-def str_to_meson(s):
+def str_to_meson(s: str) -> str:
     return "'" + s + "'"
 
 
