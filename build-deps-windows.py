@@ -373,7 +373,7 @@ def build_using_meson(name: str, arch: str, config: str, runtime: str, spec: Pac
     manifest_lines.sort()
     manifest_path = get_manifest_path(name, arch, config, runtime)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text("\n".join(manifest_lines), encoding="utf-8")
+    manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
 def get_meson_params(arch: str, config: str, runtime: str) -> Tuple[EnvDir, ShellEnv]:
     global cached_meson_params
