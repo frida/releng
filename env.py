@@ -10,7 +10,7 @@ import sys
 from typing import Callable, Literal, Optional, Sequence, Tuple
 
 from . import deps, env_android, env_apple, env_generic, machine_file
-from .machine_file import str_to_meson, strv_to_meson
+from .machine_file import bool_to_meson, str_to_meson, strv_to_meson
 from .machine_spec import MachineSpec
 
 
@@ -133,7 +133,9 @@ def generate_machine_config(machine: MachineSpec,
     config["constants"] = OrderedDict()
     config["binaries"] = OrderedDict()
     config["built-in options"] = OrderedDict()
-    config["properties"] = OrderedDict()
+    config["properties"] = OrderedDict([
+        ("needs_exe_wrapper", bool_to_meson(needs_exe_wrapper(machine, build_machine))),
+    ])
     config["host_machine"] = OrderedDict([
         ("system", str_to_meson(machine.system)),
         ("subsystem", str_to_meson(machine.subsystem)),
@@ -210,6 +212,13 @@ def generate_machine_config(machine: MachineSpec,
     config.write(sink)
 
     return (sink.getvalue(), machine_path, machine_env)
+
+
+def needs_exe_wrapper(machine: MachineSpec,
+                      build_machine: MachineSpec) -> bool:
+    if os.environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
+        return False
+    return machine != build_machine
 
 
 def query_toolchain_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
