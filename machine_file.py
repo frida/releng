@@ -94,6 +94,10 @@ def load(mfile: Path) -> Dict[str, Union[str, List[str]]]:
     return items
 
 
+def bool_to_meson(b: bool) -> str:
+    return "true" if b else "false"
+
+
 def strv_to_meson(strv: Sequence[str]) -> str:
     return "[" + ", ".join(map(str_to_meson, strv)) + "]"
 
