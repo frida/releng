@@ -56,20 +56,20 @@ class MesonEnv:
     shell_env: ShellEnv
 
 
-ALL_ARCHITECTURES = {'x86_64', 'x86'}
-ALL_CONFIGURATIONS = {'release', 'debug'}
+ALL_ARCHITECTURES = {"x86_64", "x86"}
+ALL_CONFIGURATIONS = {"release", "debug"}
 
 ARCHITECTURES = {
-    PackageRole.TOOL: ['x86'],
-    PackageRole.LIBRARY: ['x86_64', 'x86'],
+    PackageRole.TOOL: ["x86"],
+    PackageRole.LIBRARY: ["x86_64", "x86"],
 }
 CONFIGURATIONS = {
-    PackageRole.TOOL: ['release'],
-    PackageRole.LIBRARY: ['debug', 'release'],
+    PackageRole.TOOL: ["release"],
+    PackageRole.LIBRARY: ["debug", "release"],
 }
 RUNTIMES = {
-    PackageRole.TOOL: ['static'],
-    PackageRole.LIBRARY: ['static', 'dynamic'],
+    PackageRole.TOOL: ["static"],
+    PackageRole.LIBRARY: ["static", "dynamic"],
 }
 COMPRESSION_LEVEL = 9
 
@@ -163,7 +163,7 @@ def main():
     parser.add_argument("--host", help="only build for one specific host",
                         default=None)
     parser.add_argument("--v8", help="whether to include V8 in the SDK",
-                        default='enabled', choices=['enabled', 'disabled'])
+                        default="enabled", choices=["enabled", "disabled"])
 
     arguments = parser.parse_args()
 
@@ -193,7 +193,7 @@ def main():
 
     selected = set([pkg_name for bundle_id in bundle_ids for pkg_name in ALL_BUNDLES[bundle_id]])
     packages = [pkg for pkg in ALL_PACKAGES if pkg[0] in selected]
-    if arguments.v8 == 'disabled':
+    if arguments.v8 == "disabled":
         packages = [pkg for pkg in packages if pkg[0] != "v8"]
 
     params = read_dependency_parameters(HOST_DEFINES)
@@ -263,7 +263,7 @@ def check_environment():
             sys.exit(1)
 
 def grab_and_prepare(name: str, spec: PackageSpec, params: DependencyParameters) -> SourceState:
-    assert spec.recipe == 'meson'
+    assert spec.recipe == "meson"
     assert spec.patches == []
 
     source_dir = DEPS_DIR / name
@@ -324,7 +324,7 @@ def build_package(name: str, role: PackageRole, spec: PackageSpec, extra_options
                 print()
                 print("*** Building {} with arch={} runtime={} config={} spec={}".format(spec.name, arch, config, runtime, spec), flush=True)
 
-                assert spec.recipe == 'meson'
+                assert spec.recipe == "meson"
                 build_using_meson(name, arch, config, runtime, spec, extra_options)
 
                 assert manifest_path.exists()
@@ -335,8 +335,8 @@ def build_using_meson(name: str, arch: str, config: str, runtime: str, spec: Pac
     source_dir = DEPS_DIR / name
     build_dir = env_dir / name
     prefix = get_prefix_path(arch, config, runtime)
-    optimization = 's' if config == 'release' else '0'
-    ndebug = 'true' if config == 'release' else 'false'
+    optimization = "s" if config == "release" else "0"
+    ndebug = "true" if config == "release" else "false"
 
     if build_dir.exists():
         shutil.rmtree(build_dir)
@@ -366,14 +366,14 @@ def build_using_meson(name: str, arch: str, config: str, runtime: str, spec: Pac
             "--installed"
         ],
         cwd=build_dir,
-        encoding='utf-8',
+        encoding="utf-8",
         env=shell_env))
     for installed_path in install_locations.values():
         manifest_lines.append(Path(installed_path).relative_to(prefix).as_posix())
     manifest_lines.sort()
     manifest_path = get_manifest_path(name, arch, config, runtime)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text("\n".join(manifest_lines), encoding='utf-8')
+    manifest_path.write_text("\n".join(manifest_lines), encoding="utf-8")
 
 def get_meson_params(arch: str, config: str, runtime: str) -> Tuple[EnvDir, ShellEnv]:
     global cached_meson_params
@@ -407,7 +407,7 @@ def generate_meson_env(arch: str, config: str, runtime: str) -> MesonEnv:
     ])
 
     platform_cflags = []
-    if arch == 'x86':
+    if arch == "x86":
         platform_cflags += ["/arch:SSE2"]
 
     cflags = " ".join(platform_cflags)
@@ -457,7 +457,7 @@ set VALA={valac}
             platform=msvc_platform,
             valac=detect_bootstrap_valac(),
         ),
-        encoding='utf-8')
+        encoding="utf-8")
 
     rc_path = winsdk_bindir / "rc.exe"
     rc_wrapper_path = env_dir / "rc.bat"
@@ -466,14 +466,14 @@ SETLOCAL EnableExtensions
 SET _res=0
 "{rc_path}" {flags} %* || SET _res=1
 ENDLOCAL & SET _res=%_res%
-EXIT /B %_res%""".format(rc_path=rc_path, flags=clflags), encoding='utf-8')
+EXIT /B %_res%""".format(rc_path=rc_path, flags=clflags), encoding="utf-8")
 
     (env_dir / "meson.bat").write_text("""@ECHO OFF
 SETLOCAL EnableExtensions
 SET _res=0
 "{python_interpreter}" "{meson_path}" %* || SET _res=1
 ENDLOCAL & SET _res=%_res%
-EXIT /B %_res%""".format(python_interpreter=sys.executable, meson_path=MESON), encoding='utf-8')
+EXIT /B %_res%""".format(python_interpreter=sys.executable, meson_path=MESON), encoding="utf-8")
 
     pkgconfig_path = BOOTSTRAP_TOOLCHAIN_DIR / "bin" / "pkg-config.exe"
     pkgconfig_lib_dir = prefix / "lib" / "pkgconfig"
@@ -488,7 +488,7 @@ EXIT /B %_res%""".format(
             pkgconfig_path=pkgconfig_path,
             pkgconfig_lib_dir=pkgconfig_lib_dir,
         ),
-        encoding='utf-8')
+        encoding="utf-8")
 
     flex_path = BOOTSTRAP_TOOLCHAIN_DIR / "bin" / "flex.exe"
     flex_wrapper_path = env_dir / "flex.py"
@@ -497,13 +497,13 @@ SETLOCAL EnableExtensions
 SET _res=0
 "{python_interpreter}" "{wrapper_path}" %* || SET _res=1
 ENDLOCAL & SET _res=%_res%
-EXIT /B %_res%""".format(python_interpreter=sys.executable, wrapper_path=flex_wrapper_path), encoding='utf-8')
+EXIT /B %_res%""".format(python_interpreter=sys.executable, wrapper_path=flex_wrapper_path), encoding="utf-8")
     flex_wrapper_path.write_text("""import subprocess
 import sys
 
 args = [arg.replace("/", "\\\\") for arg in sys.argv[1:]]
 sys.exit(subprocess.call([r"{flex_path}"] + args))
-""".format(flex_path=flex_path), encoding='utf-8')
+""".format(flex_path=flex_path), encoding="utf-8")
 
     bison_path = BOOTSTRAP_TOOLCHAIN_DIR / "bin" / "bison.exe"
     bison_wrapper_path = env_dir / "bison.py"
@@ -512,7 +512,7 @@ SETLOCAL EnableExtensions
 SET _res=0
 "{python_interpreter}" "{wrapper_path}" %* || SET _res=1
 ENDLOCAL & SET _res=%_res%
-EXIT /B %_res%""".format(python_interpreter=sys.executable, wrapper_path=bison_wrapper_path), encoding='utf-8')
+EXIT /B %_res%""".format(python_interpreter=sys.executable, wrapper_path=bison_wrapper_path), encoding="utf-8")
     bison_wrapper_path.write_text("""\
 import os
 import subprocess
@@ -528,7 +528,7 @@ sys.exit(subprocess.call([r"{bison_path}"] + args))
             bison_pkgdatadir=bison_pkgdatadir,
             m4_path=m4_path
         ),
-        encoding='utf-8')
+        encoding="utf-8")
 
     shell_env = {}
     shell_env.update(os.environ)
@@ -578,7 +578,7 @@ def package(bundle_ids: List[Bundle], params: DependencyParameters, host_selecto
         toolchain_files = []
         toolchain_mixin_files = []
         if Bundle.TOOLCHAIN in bundle_ids:
-            for root, dirs, files in os.walk(get_prefix_path('x86', 'release', 'static')):
+            for root, dirs, files in os.walk(get_prefix_path("x86", "release", "static")):
                 relpath = PurePath(root).relative_to(prefixes_dir)
                 all_files = [relpath / f for f in files]
                 toolchain_files += [f for f in all_files if file_is_vala_toolchain_related(f) or \
@@ -615,14 +615,14 @@ def package(bundle_ids: List[Bundle], params: DependencyParameters, host_selecto
             copy_files(BOOTSTRAP_TOOLCHAIN_DIR, toolchain_mixin_files, toolchain_tempdir)
             copy_files(prefixes_dir, toolchain_files, toolchain_tempdir, transform_toolchain_dest)
             fix_manifests(toolchain_tempdir)
-            (toolchain_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding='utf-8')
+            (toolchain_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding="utf-8")
 
         if Bundle.SDK in bundle_ids:
             for (arch, config), sdk_path in sdk_paths.items():
                 sdk_tempdir = tempdir / sdk_path.stem
                 copy_files(prefixes_dir, sdk_files[(arch, config)], sdk_tempdir, transform_sdk_dest)
                 fix_manifests(sdk_tempdir)
-                (sdk_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding='utf-8')
+                (sdk_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding="utf-8")
 
         print("Compressing...", flush=True)
         compression_switches = ["a", "-mx{}".format(COMPRESSION_LEVEL), "-sfx7zCon.sfx"]
@@ -643,7 +643,7 @@ def fix_manifests(root: Path):
         manifest_lines = []
 
         prefix = manifest_path.parent.parent
-        for entry in manifest_path.read_text(encoding='utf-8').strip().split("\n"):
+        for entry in manifest_path.read_text(encoding="utf-8").strip().split("\n"):
             if prefix.joinpath(entry).exists():
                 manifest_lines.append(entry)
 
@@ -654,7 +654,7 @@ def fix_manifests(root: Path):
 
         if len(manifest_lines) > 0:
             manifest_lines.sort()
-            manifest_path.write_text("\n".join(manifest_lines), encoding='utf-8')
+            manifest_path.write_text("\n".join(manifest_lines), encoding="utf-8")
         else:
             manifest_path.unlink()
 
@@ -703,7 +703,7 @@ def transform_sdk_dest(srcfile: PurePath) -> PurePath:
 
     arch, config, runtime = rootdir.split("-")
 
-    if runtime == 'dynamic' and subpath.parts[0] == "lib":
+    if runtime == "dynamic" and subpath.parts[0] == "lib":
         subpath = PurePath("lib-dynamic").joinpath(*subpath.parts[1:])
 
     return subpath / srcfile.name
@@ -715,7 +715,7 @@ def transform_toolchain_dest(srcfile: PurePath) -> PurePath:
 def ensure_bootstrap_toolchain(bootstrap_version: str) -> SourceState:
     if BOOTSTRAP_TOOLCHAIN_DIR.exists():
         try:
-            version = (BOOTSTRAP_TOOLCHAIN_DIR / "VERSION.txt").read_text(encoding='utf-8').strip()
+            version = (BOOTSTRAP_TOOLCHAIN_DIR / "VERSION.txt").read_text(encoding="utf-8").strip()
             if version == bootstrap_version:
                 return SourceState.PRISTINE
         except:
@@ -768,8 +768,8 @@ def get_tmp_path(arch: str, config: str, runtime: str) -> Path:
     return get_tmp_root() / "{}-{}-{}".format(arch, config.lower(), runtime)
 
 def vscrt_from_configuration_and_runtime(config: str, runtime: str) -> str:
-    result = "md" if runtime == 'dynamic' else "mt"
-    if config == 'debug':
+    result = "md" if runtime == "dynamic" else "mt"
+    if config == "debug":
         result += "d"
     return result
 
@@ -779,7 +779,7 @@ def perform(*args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
 def query_git_head(repo_path: str) -> str:
-    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path, encoding='utf-8').strip()
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path, encoding="utf-8").strip()
 
 def copy_files(fromdir: Path, files: List[PurePath], todir: Path, transformdest: Callable[[PurePath], PurePath] = transform_identity):
     for filename in files:
@@ -795,5 +795,5 @@ def format_duration(duration_in_seconds: float) -> str:
     return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
