@@ -213,7 +213,9 @@ def generate_machine_config(machine: MachineSpec,
 
 
 def query_toolchain_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    return deps_dir / f"toolchain-{machine.identifier}"
+    identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
+            else machine.identifier
+    return deps_dir / f"toolchain-{identifier}"
 
 
 def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
