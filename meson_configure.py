@@ -360,20 +360,28 @@ def parse_option_meta(name: str, opt: UserOption[Any]):
     params = {}
 
     if isinstance(opt, UserStringOption):
-        val = repr(opt.value)
-    else:
-        val = opt.value
-    params["help"] = f"{opt.description} (default: {str(val).lower()})"
-
-    if isinstance(opt, UserArrayOption):
+        default_value = repr(opt.value)
+        metavar = name.upper()
+    elif isinstance(opt, UserArrayOption):
+        default_value = ",".join(opt.value)
         metavar = "{" + ",".join(opt.choices) + "}"
     elif isinstance(opt, UserComboOption):
+        default_value = opt.value
         metavar = "{" + "|".join(opt.choices) + "}"
     else:
+        default_value = str(opt.value).lower()
         metavar = name.upper()
+
+    params["help"] = f"{help_text_from_meson(opt.description)} (default: {default_value})"
     params["metavar"] = metavar
 
     return params
+
+
+def help_text_from_meson(description: str) -> str:
+    if description:
+        return description[0].lower() + description[1:]
+    return description
 
 
 def collect_meson_options(options: argparse.Namespace) -> List[str]:
