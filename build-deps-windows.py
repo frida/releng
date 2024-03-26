@@ -57,15 +57,15 @@ class MesonEnv:
 
 
 ALL_ARCHITECTURES = {'x86_64', 'x86'}
-ALL_CONFIGURATIONS = {'Release', 'Debug'}
+ALL_CONFIGURATIONS = {'release', 'debug'}
 
 ARCHITECTURES = {
     PackageRole.TOOL: ['x86'],
     PackageRole.LIBRARY: ['x86_64', 'x86'],
 }
 CONFIGURATIONS = {
-    PackageRole.TOOL: ['Release'],
-    PackageRole.LIBRARY: ['Debug', 'Release'],
+    PackageRole.TOOL: ['release'],
+    PackageRole.LIBRARY: ['debug', 'release'],
 }
 RUNTIMES = {
     PackageRole.TOOL: ['static'],
@@ -183,7 +183,6 @@ def main():
             host += "-release"
             tokens += ["release"]
         os, arch, config = tokens
-        config = config.title()
         if os != "windows":
             parser.error(f"invalid os: {os}")
         if arch not in ALL_ARCHITECTURES:
@@ -210,7 +209,7 @@ def main():
         build(packages, params, host_selector)
         build_ended_at = time.time()
 
-        package(bundle_ids, params, host)
+        package(bundle_ids, params, host_selector)
         packaging_ended_at = time.time()
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
@@ -336,8 +335,8 @@ def build_using_meson(name: str, arch: str, config: str, runtime: str, spec: Pac
     source_dir = DEPS_DIR / name
     build_dir = env_dir / name
     prefix = get_prefix_path(arch, config, runtime)
-    optimization = 's' if config == 'Release' else '0'
-    ndebug = 'true' if config == 'Release' else 'false'
+    optimization = 's' if config == 'release' else '0'
+    ndebug = 'true' if config == 'release' else 'false'
 
     if build_dir.exists():
         shutil.rmtree(build_dir)
@@ -553,24 +552,23 @@ def detect_bootstrap_valac() -> str:
     return cached_bootstrap_valac
 
 
-def package(bundle_ids: List[Bundle], params: DependencyParameters, host: str | None):
+def package(bundle_ids: List[Bundle], params: DependencyParameters, host_selector: HostSelector):
     with tempfile.TemporaryDirectory(prefix="frida-deps") as tempdir:
         tempdir = Path(tempdir)
 
-        toolchain_filename = "toolchain-windows-x86.exe"
-        toolchain_path = ROOT_DIR / "build" / toolchain_filename
+        toolchain_path = ROOT_DIR / "build" / "toolchain-windows-x86.exe"
 
-        if host is None:
-            sdk_filename = "sdk-windows-any.exe"
-        else:
-            sdk_filename = f"sdk-{host}.exe"
-        sdk_path = ROOT_DIR / "build" / sdk_filename
+        sdk_paths = {}
+        for arch in host_selector.architectures:
+            for config in host_selector.configurations:
+                sdk_paths[(arch, config)] = ROOT_DIR / "build" / f"sdk-windows-{arch}-{config}.exe"
 
         print("About to assemble:")
         if Bundle.TOOLCHAIN in bundle_ids:
-            print("\t* " + toolchain_filename)
+            print("\t* " + toolchain_path.name)
         if Bundle.SDK in bundle_ids:
-            print("\t* " + sdk_filename)
+            for sdk_path in sorted(sdk_paths.values()):
+                print("\t* " + sdk_path.name)
 
         print()
         print("Determining what to include...", flush=True)
@@ -580,7 +578,7 @@ def package(bundle_ids: List[Bundle], params: DependencyParameters, host: str | 
         toolchain_files = []
         toolchain_mixin_files = []
         if Bundle.TOOLCHAIN in bundle_ids:
-            for root, dirs, files in os.walk(get_prefix_path('x86', 'Release', 'static')):
+            for root, dirs, files in os.walk(get_prefix_path('x86', 'release', 'static')):
                 relpath = PurePath(root).relative_to(prefixes_dir)
                 all_files = [relpath / f for f in files]
                 toolchain_files += [f for f in all_files if file_is_vala_toolchain_related(f) or \
@@ -595,46 +593,48 @@ def package(bundle_ids: List[Bundle], params: DependencyParameters, host: str | 
                         f.parent.name == "manifest")]
             toolchain_mixin_files.sort()
 
-        sdk_built_files = []
+        sdk_files = {}
         if Bundle.SDK in bundle_ids:
-            if host is None:
-                prefix_pattern = "*-static"
-            else:
-                arch, config = host.split("-")[1:]
-                prefix_pattern = "-".join([arch, config, "static"])
-            for prefix in prefixes_dir.glob(prefix_pattern):
-                for root, dirs, files in os.walk(prefix):
-                    relpath = PurePath(root).relative_to(prefixes_dir)
-                    all_files = [relpath / f for f in files]
-                    sdk_built_files += [f for f in all_files if file_is_sdk_related(f)]
-                sdk_built_files += [f.relative_to(prefixes_dir) for f in \
-                        (prefix.parent / (prefix.name[:-7] + "-dynamic") / "lib").glob("**/*.a")]
-            sdk_built_files.sort()
+            for arch in host_selector.architectures:
+                for config in host_selector.configurations:
+                    cur_files = []
+                    sdk_files[(arch, config)] = cur_files
+                    prefix_pattern = "-".join([arch, config, "static"])
+                    for prefix in prefixes_dir.glob(prefix_pattern):
+                        for root, dirs, files in os.walk(prefix):
+                            relpath = PurePath(root).relative_to(prefixes_dir)
+                            all_files = [relpath / f for f in files]
+                            cur_files += [f for f in all_files if file_is_sdk_related(f)]
+                        cur_files += [f.relative_to(prefixes_dir) for f in \
+                                (prefix.parent / (prefix.name[:-7] + "-dynamic") / "lib").glob("**/*.a")]
+                    cur_files.sort()
 
         print("Copying files...", flush=True)
         if Bundle.TOOLCHAIN in bundle_ids:
-            toolchain_tempdir = tempdir / "toolchain-windows"
+            toolchain_tempdir = tempdir / toolchain_path.stem
             copy_files(BOOTSTRAP_TOOLCHAIN_DIR, toolchain_mixin_files, toolchain_tempdir)
             copy_files(prefixes_dir, toolchain_files, toolchain_tempdir, transform_toolchain_dest)
             fix_manifests(toolchain_tempdir)
             (toolchain_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding='utf-8')
 
         if Bundle.SDK in bundle_ids:
-            sdk_tempdir = tempdir / "sdk-windows"
-            copy_files(prefixes_dir, sdk_built_files, sdk_tempdir, transform_sdk_dest)
-            fix_manifests(sdk_tempdir)
-            (sdk_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding='utf-8')
+            for (arch, config), sdk_path in sdk_paths.items():
+                sdk_tempdir = tempdir / sdk_path.stem
+                copy_files(prefixes_dir, sdk_files[(arch, config)], sdk_tempdir, transform_sdk_dest)
+                fix_manifests(sdk_tempdir)
+                (sdk_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding='utf-8')
 
         print("Compressing...", flush=True)
         compression_switches = ["a", "-mx{}".format(COMPRESSION_LEVEL), "-sfx7zCon.sfx"]
 
         if Bundle.TOOLCHAIN in bundle_ids:
             toolchain_path.unlink(missing_ok=True)
-            perform("7z", *compression_switches, "-r", toolchain_path, "toolchain-windows", cwd=tempdir)
+            perform("7z", *compression_switches, "-r", toolchain_path, ".", cwd=toolchain_tempdir)
 
         if Bundle.SDK in bundle_ids:
-            sdk_path.unlink(missing_ok=True)
-            perform("7z", *compression_switches, "-r", sdk_path, "sdk-windows", cwd=tempdir)
+            for (arch, config), sdk_path in sdk_paths.items():
+                sdk_path.unlink(missing_ok=True)
+                perform("7z", *compression_switches, "-r", sdk_path, ".", cwd=tempdir / sdk_path.stem)
 
         print("All done.", flush=True)
 
@@ -702,15 +702,11 @@ def transform_sdk_dest(srcfile: PurePath) -> PurePath:
     subpath = PurePath(*parts[1:])
 
     arch, config, runtime = rootdir.split("-")
-    rootdir = "-".join([
-        winenv.msvs_platform_from_arch(arch),
-        config.title()
-    ])
 
     if runtime == 'dynamic' and subpath.parts[0] == "lib":
         subpath = PurePath("lib-dynamic").joinpath(*subpath.parts[1:])
 
-    return PurePath(rootdir) / subpath / srcfile.name
+    return subpath / srcfile.name
 
 def transform_toolchain_dest(srcfile: PurePath) -> PurePath:
     return PurePath(*srcfile.parts[1:])
@@ -773,7 +769,7 @@ def get_tmp_path(arch: str, config: str, runtime: str) -> Path:
 
 def vscrt_from_configuration_and_runtime(config: str, runtime: str) -> str:
     result = "md" if runtime == 'dynamic' else "mt"
-    if config == 'Debug':
+    if config == 'debug':
         result += "d"
     return result
 
