@@ -80,6 +80,7 @@ MESON = RELENG_DIR / "meson" / "meson.py"
 NINJA = BOOTSTRAP_TOOLCHAIN_DIR / "bin" / "ninja.exe"
 
 ALL_PACKAGES: List[Package] = [
+    ("ninja", PackageRole.TOOL, []),
     ("zlib", PackageRole.LIBRARY, []),
     ("xz", PackageRole.LIBRARY, []),
     ("brotli", PackageRole.LIBRARY, []),
@@ -110,6 +111,7 @@ ALL_PACKAGES: List[Package] = [
 
 ALL_BUNDLES = {
     Bundle.TOOLCHAIN: [
+        "ninja",
         "zlib",
         "libffi",
         "pcre2",
@@ -263,8 +265,7 @@ def check_environment():
             sys.exit(1)
 
 def grab_and_prepare(name: str, spec: PackageSpec, params: DependencyParameters) -> SourceState:
-    assert spec.recipe == "meson"
-    assert spec.patches == []
+    assert spec.recipe == "meson" or name == "ninja"
 
     source_dir = DEPS_DIR / name
     if source_dir.exists():
@@ -282,6 +283,8 @@ def grab_and_prepare(name: str, spec: PackageSpec, params: DependencyParameters)
         DEPS_DIR.mkdir(parents=True, exist_ok=True)
         perform("git", "clone", "-q", "--recurse-submodules", spec.url, name, cwd=DEPS_DIR)
         perform("git", "checkout", "-q", spec.version, cwd=source_dir)
+        for name in spec.patches:
+            perform("git", "apply", RELENG_DIR / "patches" / name, cwd=source_dir)
         source_state = SourceState.PRISTINE
 
     return source_state
@@ -324,10 +327,47 @@ def build_package(name: str, role: PackageRole, spec: PackageSpec, extra_options
                 print()
                 print("*** Building {} with arch={} runtime={} config={} spec={}".format(spec.name, arch, config, runtime, spec), flush=True)
 
-                assert spec.recipe == "meson"
-                build_using_meson(name, arch, config, runtime, spec, extra_options)
+                if name == "ninja":
+                    build_ninja(name, arch, config, runtime)
+                else:
+                    assert spec.recipe == "meson"
+                    build_using_meson(name, arch, config, runtime, spec, extra_options)
 
                 assert manifest_path.exists()
+
+def build_ninja(name: str, arch: str, config: str, runtime: str):
+    env_dir, shell_env = get_meson_params(arch, config, runtime)
+
+    shell_env = shell_env.copy()
+    del shell_env["CL"] # Remove unicode defines
+
+    source_dir = DEPS_DIR / name
+    build_dir = env_dir / name
+    prefix = get_prefix_path(arch, config, runtime)
+    bin_dir = prefix / "bin"
+
+    if build_dir.exists():
+        perform("git", "worktree", "remove", "-f", build_dir,
+                cwd=source_dir)
+
+    perform("git", "worktree", "add", "-f", build_dir,
+            cwd=source_dir)
+
+    configure_file = build_dir / "configure.py"
+    configure_code = configure_file.read_text(encoding="utf-8")
+    configure_code = configure_code.replace("-O2", "/O1")
+    configure_file.write_text(configure_code, encoding="utf-8")
+
+    perform(sys.executable, configure_file, "--bootstrap",
+            cwd=build_dir,
+            env=shell_env)
+
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(build_dir / "ninja.exe", bin_dir)
+
+    manifest_path = get_manifest_path(name, arch, config, runtime)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text("bin/ninja.exe\n", encoding="utf-8")
 
 def build_using_meson(name: str, arch: str, config: str, runtime: str, spec: PackageSpec, extra_options: List[str]):
     env_dir, shell_env = get_meson_params(arch, config, runtime)
@@ -582,7 +622,7 @@ def package(bundle_ids: List[Bundle], params: DependencyParameters, host_selecto
                 relpath = PurePath(root).relative_to(prefixes_dir)
                 all_files = [relpath / f for f in files]
                 toolchain_files += [f for f in all_files if file_is_vala_toolchain_related(f) or \
-                        f.name in ["pkg-config.exe", "glib-genmarshal", "glib-mkenums"] or \
+                        f.name in {"ninja.exe", "pkg-config.exe", "glib-genmarshal", "glib-mkenums"} or \
                         f.parent.name == "manifest"]
             toolchain_files.sort()
 
