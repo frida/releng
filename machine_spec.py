@@ -146,6 +146,15 @@ class MachineSpec:
     def endian(self) -> str:
         return "big" if self.arch in BIG_ENDIAN_ARCHS else "little"
 
+    @property
+    def pointer_size(self) -> int:
+        arch = self.arch
+        if arch in {"x86_64", "s390x"}:
+            return 8
+        if arch.startswith("arm64") or arch.startswith("mips64"):
+            return 8
+        return 4
+
     def __eq__(self, other):
         if isinstance(other, MachineSpec):
             return other.identifier == self.identifier
