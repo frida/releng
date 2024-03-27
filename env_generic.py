@@ -187,6 +187,11 @@ def init_machine_config(machine: MachineSpec,
 
     binaries = OrderedDict()
     cc = None
+    common_flags = []
+    c_like_flags = []
+    linker_flags = []
+    cxx_like_flags = []
+    cxx_link_flags = []
 
     triplet = machine.triplet
     if triplet is not None:
@@ -284,18 +289,26 @@ def init_machine_config(machine: MachineSpec,
             })
 
             machine_path += winenv.detect_msvs_runtime_path(machine, build_machine)
-        else:
-            suffix = ":\n" + diagnostics if diagnostics is not None else ""
-            raise CompilerNotFoundError("no C compiler found" + suffix)
+        elif machine != build_machine \
+                and "CC" not in os.environ \
+                and "CFLAGS" not in os.environ \
+                and machine.os == build_machine.os \
+                and machine.os == "linux" \
+                and machine.pointer_size == 4 \
+                and build_machine.pointer_size == 8:
+            try:
+                cc, gcc_binaries = resolve_gcc_binaries()
+                binaries.update(gcc_binaries)
+                common_flags += ["-m32"]
+            except CompilerNotFoundError:
+                pass
+
+    if cc is None:
+        suffix = ":\n" + diagnostics if diagnostics is not None else ""
+        raise CompilerNotFoundError("no C compiler found" + suffix)
 
     if "cpp" not in binaries:
         raise CompilerNotFoundError("no C++ compiler found")
-
-    common_flags = []
-    c_like_flags = []
-    linker_flags = []
-    cxx_like_flags = []
-    cxx_link_flags = []
 
     if linker_flavor is None:
         linker_flavor = detect_linker_flavor(cc)
