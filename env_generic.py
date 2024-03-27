@@ -349,13 +349,13 @@ def init_machine_config(machine: MachineSpec,
     return (machine_path, machine_env)
 
 
-def build_envvar_to_host(name):
+def build_envvar_to_host(name: str) -> str:
     if name.endswith("_FOR_BUILD"):
         return name[:-10]
     return name
 
 
-def detect_linker_flavor(cc):
+def detect_linker_flavor(cc: list[str]) -> str:
     linker_version = subprocess.run(cc + ["-Wl,--version"],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT,
