@@ -138,7 +138,20 @@ TOOLCHAIN_ENVVARS = {
     "CSFLAGS",
 }
 
+GCC_TOOL_IDS = [
+    "c",
+    "cpp",
+    "ar",
+    "nm",
+    "ranlib",
+    "strip",
+    "readelf",
+    "objcopy",
+    "objdump",
+]
+
 GCC_TOOL_NAMES = {
+    "c": "gcc",
     "cpp": "g++",
     "ar": "gcc-ar",
     "nm": "gcc-nm",
@@ -177,18 +190,11 @@ def init_machine_config(machine: MachineSpec,
 
     triplet = machine.triplet
     if triplet is not None:
-        toolprefix = triplet + "-"
-        gcc = shutil.which(toolprefix + "gcc")
-        if gcc is not None:
-            cc = [gcc]
-            binaries["c"] = strv_to_meson(cc) + " + common_flags"
-            for identifier in ["cpp", "ar", "nm", "ranlib", "strip",
-                               "readelf", "objcopy", "objdump"]:
-                name = GCC_TOOL_NAMES.get(identifier, identifier)
-                val = shutil.which(toolprefix + name)
-                if val is not None:
-                    extra = " + common_flags" if identifier == "cpp" else ""
-                    binaries[identifier] = strv_to_meson([val]) + extra
+        try:
+            cc, gcc_binaries = resolve_gcc_binaries(toolprefix=triplet + "-")
+            binaries.update(gcc_binaries)
+        except CompilerNotFoundError:
+            pass
 
     diagnostics = None
     if cc is None:
@@ -353,6 +359,28 @@ def build_envvar_to_host(name: str) -> str:
     if name.endswith("_FOR_BUILD"):
         return name[:-10]
     return name
+
+
+def resolve_gcc_binaries(toolprefix: str = "") -> tuple[list[str], dict[str, str]]:
+    cc = None
+    binaries = OrderedDict()
+
+    for identifier in GCC_TOOL_IDS:
+        name = GCC_TOOL_NAMES.get(identifier, identifier)
+        full_name = toolprefix + name
+
+        val = shutil.which(full_name)
+        if val is None:
+            raise CompilerNotFoundError(f"missing {full_name}")
+
+        if identifier == "c":
+            cc = [val]
+
+        extra = " + common_flags" if identifier in {"c", "cpp"} else ""
+
+        binaries[identifier] = strv_to_meson([val]) + extra
+
+    return (cc, binaries)
 
 
 def detect_linker_flavor(cc: list[str]) -> str:
