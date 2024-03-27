@@ -24,7 +24,7 @@ if __name__ == "__main__":
     # TODO: Refactor
     sys.path.insert(0, str(ROOT_DIR))
 
-from releng import winenv
+from releng import env, winenv
 from releng.machine_spec import MachineSpec
 
 
@@ -46,7 +46,7 @@ class PackageRole(Enum):
     LIBRARY = 2,
 
 
-Package = tuple[str, PackageRole, list[str]]
+Package = tuple[str, PackageRole]
 
 
 class SourceState(Enum):
@@ -142,19 +142,6 @@ def ensure_toolchain(machine: MachineSpec,
     toolchain_prefix = query_toolchain_prefix(machine, cache_dir)
     state = sync(Bundle.TOOLCHAIN, machine, toolchain_prefix, version)
     return (toolchain_prefix, state)
-
-
-def detect_toolchain_vala_compiler(toolchain_prefix: Path,
-                                   build_machine: MachineSpec) -> Optional[tuple[Path, Path]]:
-    datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
-    if datadir is None:
-        return None
-
-    api_version = datadir.name.split("-", maxsplit=1)[1]
-
-    valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
-    vapidir = datadir / "vapi"
-    return (valac, vapidir)
 
 
 def query_sdk_prefix(machine: MachineSpec,
@@ -363,25 +350,13 @@ def roll(bundle: Bundle, machine: MachineSpec, activate: bool, post: Optional[Pa
 
 
 def build(bundle: Bundle, machine: MachineSpec):
-    params = read_dependency_parameters({})
-
     packages: list[Package] = [
-        ("zlib", PackageRole.LIBRARY, []),
+        ("zlib", PackageRole.LIBRARY),
     ]
 
-    started_at = time.time()
-    sync_ended_at = None
-    build_ended_at = None
-    packaging_ended_at = None
+    builder = DependencyBuilder(machine)
     try:
-        synchronize_repos(packages, params)
-        sync_ended_at = time.time()
-
-        build(packages, params, host_selector)
-        build_ended_at = time.time()
-
-        package(bundle_ids, params, host_selector)
-        packaging_ended_at = time.time()
+        builder.build(packages)
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
         if e.stdout is not None:
@@ -389,78 +364,235 @@ def build(bundle: Bundle, machine: MachineSpec):
         if e.stderr is not None:
             print("\n=== stderr ===\n" + e.stderr, file=sys.stderr)
         sys.exit(1)
-    finally:
-        ended_at = time.time()
-
-        if sync_ended_at is not None:
-            print("")
-            print("*** TIME SPENT")
-            print("")
-            print("      Total: {}".format(format_duration(ended_at - started_at)))
-
-        if sync_ended_at is not None:
-            print("       Sync: {}".format(format_duration(sync_ended_at - started_at)))
-
-        if build_ended_at is not None:
-            print("      Build: {}".format(format_duration(build_ended_at - sync_ended_at)))
-
-        if packaging_ended_at is not None:
-            print("  Packaging: {}".format(format_duration(packaging_ended_at - build_ended_at)))
 
 
-def synchronize_repos(packages: list[Package], params: DependencyParameters):
-    build_machine = MachineSpec.make_from_local_system()
-    cache_dir = detect_cache_dir(ROOT_DIR)
+class DependencyBuilder:
+    def __init__(self, host_machine: MachineSpec):
+        self._build_machine = MachineSpec.make_from_local_system()
+        self._host_machine = host_machine
 
-    toolchain_prefix, toolchain_state = ensure_toolchain(build_machine, cache_dir)
-    if toolchain_state == SourceState.MODIFIED:
-        wipe_build_state()
+        self._params = read_dependency_parameters({})
+        self._cachedir = detect_cache_dir(ROOT_DIR)
+        self._workdir = self._cachedir / "src"
 
-    #check_build_environment()
+        self._toolchain_prefix: Optional[Path] = None
+        self._native_file: Optional[Path] = None
+        self._cross_file: Optional[Path] = None
+        self._machine_env: dict[str, str] = {}
 
-    for name, _, _ in packages:
-        pkg_state = grab_and_prepare(name, params.get_package_spec(name), params)
-        if pkg_state == SourceState.MODIFIED:
-            wipe_build_state()
+    def build(self, packages: list[Package]):
+        started_at = time.time()
+        prepare_ended_at = None
+        build_ended_at = None
+        packaging_ended_at = None
+        try:
+            self._prepare(packages)
+            prepare_ended_at = time.time()
 
+            for name, role in packages:
+                self._build_package(name, role, self._params.get_package_spec(name))
+            build_ended_at = time.time()
 
-def grab_and_prepare(name: str, spec: PackageSpec, params: DependencyParameters) -> SourceState:
-    assert spec.recipe == "meson" or name == "ninja"
+            self._package(bundle_ids)
+            packaging_ended_at = time.time()
+        finally:
+            ended_at = time.time()
 
-    source_dir = DEPS_DIR / name
-    if source_dir.exists():
-        if query_git_head(source_dir) == spec.version:
-            source_state = SourceState.PRISTINE
+            if prepare_ended_at is not None:
+                print("")
+                print("*** TIME SPENT")
+                print("")
+                print("      Total: {}".format(format_duration(ended_at - started_at)))
+
+            if prepare_ended_at is not None:
+                print("    Prepare: {}".format(format_duration(prepare_ended_at - started_at)))
+
+            if build_ended_at is not None:
+                print("      Build: {}".format(format_duration(build_ended_at - prepare_ended_at)))
+
+            if packaging_ended_at is not None:
+                print("  Packaging: {}".format(format_duration(packaging_ended_at - build_ended_at)))
+
+    def _prepare(self, packages: list[Package]):
+        self._toolchain_prefix, toolchain_state = ensure_toolchain(self._build_machine, self._cachedir)
+        if toolchain_state == SourceState.MODIFIED:
+            self._wipe_build_state()
+
+        (self._native_file, self._cross_file, machine_paths, machine_env) = \
+                env.generate_machine_files(build_machine=self._build_machine,
+                                           build_sdk_prefix=None,
+                                           host_machine=self._host_machine,
+                                           host_sdk_prefix=None,
+                                           toolchain_prefix=self._toolchain_prefix,
+                                           default_library="static",
+                                           call_selected_meson=lambda argv, *args, **kwargs: env.call_meson(argv,
+                                                                                                            use_submodule=True,
+                                                                                                            *args, **kwargs),
+                                           outdir=self._get_outdir())
+        menv = {**os.environ, **machine_env}
+        menv["PATH"] = os.pathsep.join(machine_paths) + os.pathsep + menv["PATH"]
+        self._machine_env = menv
+
+        #self._check_build_environment()
+
+        for name, _ in packages:
+            pkg_state = self._grab_and_prepare(name, self._params.get_package_spec(name))
+            if pkg_state == SourceState.MODIFIED:
+                self._wipe_build_state()
+
+    def _grab_and_prepare(self, name: str, spec: PackageSpec) -> SourceState:
+        assert spec.recipe == "meson" or name == "ninja"
+
+        repodir = self._workdir / name
+        if repodir.exists():
+            if query_git_head(repodir) == spec.version:
+                source_state = SourceState.PRISTINE
+            else:
+                print()
+                print("{name}: synchronizing".format(name=name), flush=True)
+                perform("git", "fetch", "-q",
+                        cwd=repodir)
+                perform("git", "checkout", "-q", spec.version,
+                        cwd=repodir)
+                source_state = SourceState.MODIFIED
         else:
             print()
-            print("{name}: synchronizing".format(name=name), flush=True)
-            perform("git", "fetch", "-q", cwd=source_dir)
-            perform("git", "checkout", "-q", spec.version, cwd=source_dir)
-            source_state = SourceState.MODIFIED
-    else:
-        print()
-        print("{name}: cloning into deps\\{name}".format(name=name), flush=True)
-        DEPS_DIR.mkdir(parents=True, exist_ok=True)
-        perform("git", "clone", "-q", "--recurse-submodules", spec.url, name, cwd=DEPS_DIR)
-        perform("git", "checkout", "-q", spec.version, cwd=source_dir)
-        for name in spec.patches:
-            perform("git", "apply", RELENG_DIR / "patches" / name, cwd=source_dir)
-        source_state = SourceState.PRISTINE
+            print(f"{name}: cloning", flush=True)
+            repodir.parent.mkdir(parents=True, exist_ok=True)
+            perform("git", "clone", "-q", "--recurse-submodules", spec.url, repodir.name,
+                    cwd=repodir.parent)
+            perform("git", "checkout", "-q", spec.version,
+                    cwd=repodir)
+            for name in spec.patches:
+                # FIXME: If this fails and the build is restarted, we will end up skipping this part.
+                perform("git", "apply", RELENG_DIR / "patches" / name,
+                        cwd=repodir)
+            source_state = SourceState.PRISTINE
 
-    return source_state
+        return source_state
 
+    def _wipe_build_state(self):
+        print("TODO: Wipe build state")
+        #print("*** Wiping build state", flush=True)
+        #locations = [
+        #    ("existing packages", get_prefix_root()),
+        #    ("build directories", get_tmp_root()),
+        #]
+        #for description, path in locations:
+        #    if path.exists():
+        #        print("Wiping", description, flush=True)
+        #        shutil.rmtree(path)
 
-def wipe_build_state():
-    pass
-    #print("*** Wiping build state", flush=True)
-    #locations = [
-    #    ("existing packages", get_prefix_root()),
-    #    ("build directories", get_tmp_root()),
-    #]
-    #for description, path in locations:
-    #    if path.exists():
-    #        print("Wiping", description, flush=True)
-    #        shutil.rmtree(path)
+    def _build_package(self, name: str, role: PackageRole, spec: PackageSpec):
+        runtimes = ["static"]
+        if self._host_machine.os == "windows" and role is PackageRole.LIBRARY:
+            runtimes += ["dynamic"]
+
+        for runtime in runtimes:
+            manifest_path = self._get_manifest_path(name, runtime)
+            if manifest_path.exists():
+                continue
+
+            print()
+            print(f"*** Building {spec.name} for runtime={runtime} spec={spec}", flush=True)
+
+            if name == "ninja":
+                self._build_ninja(name, runtime)
+            else:
+                assert spec.recipe == "meson"
+                self._build_using_meson(name, runtime, spec)
+
+            assert manifest_path.exists()
+
+    def _build_ninja(self, name: str, runtime: str):
+        env_dir, shell_env = get_meson_params(arch, config, runtime)
+
+        shell_env = shell_env.copy()
+        del shell_env["CL"] # Remove unicode defines
+
+        source_dir = DEPS_DIR / name
+        build_dir = env_dir / name
+        prefix = get_prefix_path(arch, config, runtime)
+        bin_dir = prefix / "bin"
+
+        if build_dir.exists():
+            perform("git", "worktree", "remove", "-f", build_dir,
+                    cwd=source_dir)
+
+        perform("git", "worktree", "add", "-f", build_dir,
+                cwd=source_dir)
+
+        configure_file = build_dir / "configure.py"
+        configure_code = configure_file.read_text(encoding="utf-8")
+        configure_code = configure_code.replace("-O2", "/O1")
+        configure_file.write_text(configure_code, encoding="utf-8")
+
+        perform(sys.executable, configure_file, "--bootstrap",
+                cwd=build_dir,
+                env=shell_env)
+
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(build_dir / "ninja.exe", bin_dir)
+
+        manifest_path = self._get_manifest_path(name, runtime)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text("bin/ninja.exe\n", encoding="utf-8")
+
+    def _build_using_meson(self, name: str, runtime: str, spec: PackageSpec):
+        source_dir = DEPS_DIR / name
+        build_dir = env_dir / name
+        prefix = get_prefix_path(arch, config, runtime)
+        optimization = "s" if config == "release" else "0"
+        ndebug = "true" if config == "release" else "false"
+
+        if build_dir.exists():
+            shutil.rmtree(build_dir)
+
+        perform(
+            sys.executable, MESON,
+            "setup",
+            build_dir,
+            "--prefix", prefix,
+            "--default-library", "static",
+            "--backend", "ninja",
+            "-Doptimization=" + optimization,
+            "-Db_ndebug=" + ndebug,
+            "-Db_vscrt=" + vscrt_from_configuration_and_runtime(config, runtime),
+            *spec.options,
+            *extra_options,
+            cwd=source_dir,
+            env=shell_env
+        )
+
+        perform(NINJA, "install", cwd=build_dir, env=shell_env)
+
+        manifest_lines = []
+        install_locations = json.loads(subprocess.check_output([
+                sys.executable, MESON,
+                "introspect",
+                "--installed"
+            ],
+            cwd=build_dir,
+            encoding="utf-8",
+            env=shell_env))
+        for installed_path in install_locations.values():
+            manifest_lines.append(Path(installed_path).relative_to(prefix).as_posix())
+        manifest_lines.sort()
+        manifest_path = self._get_manifest_path(name, runtime)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
+
+    def _get_outdir(self):
+        return self._workdir / "_out"
+
+    def _get_prefix(self, runtime: str) -> Path:
+        parts = [self._host_machine.identifier]
+        if self._host_machine.os == "windows":
+            parts += [runtime]
+        return self._get_outdir() / "-".join(parts)
+
+    def _get_manifest_path(self, name: str, runtime: str) -> Path:
+        return self._get_prefix(runtime) / "manifest" / f"{name}.pkg"
 
 
 def wait(bundle: Bundle, machine: MachineSpec):
@@ -584,6 +716,21 @@ def parse_array_value(v: str, raw_params: dict[str, str]) -> list[str]:
     if v == "":
         return []
     return v.split(" ")
+
+
+def perform(*args, **kwargs):
+    print(">", " ".join([str(arg) for arg in args]), flush=True)
+    return subprocess.run(args, check=True, **kwargs)
+
+
+def query_git_head(repo_path: str) -> str:
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path, encoding="utf-8").strip()
+
+
+def format_duration(duration_in_seconds: float) -> str:
+    hours, remainder = divmod(duration_in_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
 
 
 if __name__ == "__main__":

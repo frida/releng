@@ -52,7 +52,7 @@ def generate_machine_files(build_machine: MachineSpec,
                            toolchain_prefix: Optional[Path],
                            default_library: DefaultLibrary,
                            call_selected_meson: Callable,
-                           build_dir: Path):
+                           outdir: Path):
     is_cross_build = host_machine != build_machine
 
     build_config, build_machine_path, build_machine_env = \
@@ -78,9 +78,9 @@ def generate_machine_files(build_machine: MachineSpec,
         host_machine_path = []
         host_machine_env = {}
 
-    build_dir.mkdir(parents=True, exist_ok=True)
-    build_file = write_machine_file(build_machine, build_config, build_dir)
-    host_file = write_machine_file(host_machine, host_config, build_dir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    build_file = write_machine_file(build_machine, build_config, outdir)
+    host_file = write_machine_file(host_machine, host_config, outdir)
 
     return (
         build_file,
@@ -199,3 +199,16 @@ def needs_exe_wrapper(machine: MachineSpec,
     if os.environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
         return False
     return machine != build_machine
+
+
+def detect_toolchain_vala_compiler(toolchain_prefix: Path,
+                                   build_machine: MachineSpec) -> Optional[tuple[Path, Path]]:
+    datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
+    if datadir is None:
+        return None
+
+    api_version = datadir.name.split("-", maxsplit=1)[1]
+
+    valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
+    vapidir = datadir / "vapi"
+    return (valac, vapidir)
