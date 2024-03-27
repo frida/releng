@@ -14,7 +14,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 import urllib.request
 
 RELENG_DIR = Path(__file__).parent.resolve()
@@ -24,7 +24,8 @@ if __name__ == "__main__":
     # TODO: Refactor
     sys.path.insert(0, str(ROOT_DIR))
 
-from releng import machine_spec, winenv
+from releng import winenv
+from releng.machine_spec import MachineSpec
 
 
 BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
@@ -40,6 +41,19 @@ class Bundle(Enum):
     SDK = 2,
 
 
+class PackageRole(Enum):
+    TOOL = 1,
+    LIBRARY = 2,
+
+
+Package = tuple[str, PackageRole, list[str]]
+
+
+class SourceState(Enum):
+    PRISTINE = 1,
+    MODIFIED = 2,
+
+
 class BundleNotFoundError(Exception):
     pass
 
@@ -50,17 +64,17 @@ class PackageSpec:
     version: str
     url: str
     recipe: str
-    patches: List[str]
-    deps: List[str]
-    deps_for_build: List[str]
-    options: List[str]
+    patches: list[str]
+    deps: list[str]
+    deps_for_build: list[str]
+    options: list[str]
 
 
 @dataclass
 class DependencyParameters:
     deps_version: str
     bootstrap_version: str
-    packages: Dict[str, PackageSpec]
+    packages: dict[str, PackageSpec]
 
     def get_package_spec(self, name: str) -> PackageSpec:
         return self.packages[name.replace("-", "_")]
@@ -80,20 +94,25 @@ def main():
     command.add_argument("bundle", help="bundle to synchronize", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
     command.add_argument("location", help="filesystem location")
-    command.set_defaults(func=lambda args: sync(Bundle[args.bundle.upper()], machine_spec.parse(args.host), Path(args.location).resolve()))
+    command.set_defaults(func=lambda args: sync(Bundle[args.bundle.upper()], MachineSpec.parse(args.host), Path(args.location).resolve()))
 
     command = subparsers.add_parser("roll", help="build and upload prebuilt dependencies if needed")
     command.add_argument("bundle", help="bundle to roll", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
     command.add_argument("--activate", default=False, action='store_true')
     command.add_argument("--post", help="post-processing script")
-    command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], machine_spec.parse(args.host), args.activate,
+    command.set_defaults(func=lambda args: roll(Bundle[args.bundle.upper()], MachineSpec.parse(args.host), args.activate,
                                                 Path(args.post) if args.post is not None else None))
+
+    command = subparsers.add_parser("build", help="build prebuilt dependencies")
+    command.add_argument("bundle", help="bundle to roll", choices=bundle_choices)
+    command.add_argument("host", help="OS/arch")
+    command.set_defaults(func=lambda args: build(Bundle[args.bundle.upper()], MachineSpec.parse(args.host)))
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", help="bundle to wait for", choices=bundle_choices)
     command.add_argument("host", help="OS/arch")
-    command.set_defaults(func=lambda args: wait(Bundle[args.bundle.upper()], machine_spec.parse(args.host)))
+    command.set_defaults(func=lambda args: wait(Bundle[args.bundle.upper()], MachineSpec.parse(args.host)))
 
     command = subparsers.add_parser("bump", help="bump dependency versions")
     command.set_defaults(func=lambda args: bump())
@@ -110,9 +129,64 @@ def main():
         sys.exit(1)
 
 
-def sync(bundle: Bundle, machine: machine_spec.MachineSpec, location: Path):
-    params = read_dependency_parameters()
-    version = params.deps_version
+def query_toolchain_prefix(machine: MachineSpec,
+                           cache_dir: Path) -> Path:
+    identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
+            else machine.identifier
+    return cache_dir / f"toolchain-{identifier}"
+
+
+def ensure_toolchain(machine: MachineSpec,
+                     cache_dir: Path,
+                     version: Optional[str] = None) -> tuple[Path, SourceState]:
+    toolchain_prefix = query_toolchain_prefix(machine, cache_dir)
+    state = sync(Bundle.TOOLCHAIN, machine, toolchain_prefix, version)
+    return (toolchain_prefix, state)
+
+
+def detect_toolchain_vala_compiler(toolchain_prefix: Path,
+                                   build_machine: MachineSpec) -> Optional[tuple[Path, Path]]:
+    datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
+    if datadir is None:
+        return None
+
+    api_version = datadir.name.split("-", maxsplit=1)[1]
+
+    valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
+    vapidir = datadir / "vapi"
+    return (valac, vapidir)
+
+
+def query_sdk_prefix(machine: MachineSpec,
+                     cache_dir: Path) -> Path:
+    return cache_dir / f"sdk-{machine.identifier}"
+
+
+def ensure_sdk(machine: MachineSpec,
+               cache_dir: Path,
+               version: Optional[str] = None) -> tuple[Path, SourceState]:
+    sdk_prefix = query_sdk_prefix(machine, cache_dir)
+    state = sync(Bundle.SDK, machine, sdk_prefix, version)
+    return (sdk_prefix, state)
+
+
+def detect_cache_dir(sourcedir: Path) -> Path:
+    raw_location = os.environ.get("FRIDA_DEPS", None)
+    if raw_location is not None:
+        location = Path(raw_location)
+    else:
+        location = sourcedir / "deps"
+    return location
+
+
+def sync(bundle: Bundle,
+         machine: MachineSpec,
+         location: Path,
+         version: Optional[str] = None) -> SourceState:
+    state = SourceState.PRISTINE
+
+    if version is None:
+        version = read_dependency_parameters().deps_version
 
     bundle_nick = bundle.name.lower() if bundle != Bundle.SDK else bundle.name
 
@@ -128,10 +202,11 @@ def sync(bundle: Bundle, machine: machine_spec.MachineSpec, location: Path):
         try:
             cached_version = (location / "VERSION.txt").read_text(encoding='utf-8').strip()
             if cached_version == version:
-                return
+                return state
         except:
             pass
         shutil.rmtree(location)
+        state = SourceState.MODIFIED
 
     (url, filename, suffix) = compute_bundle_parameters(bundle, machine, version)
 
@@ -209,8 +284,10 @@ def sync(bundle: Bundle, machine: machine_spec.MachineSpec, location: Path):
         if archive_is_temporary:
             archive_path.unlink()
 
+    return state
 
-def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool, post: Optional[Path]):
+
+def roll(bundle: Bundle, machine: MachineSpec, activate: bool, post: Optional[Path]):
     params = read_dependency_parameters()
     version = params.deps_version
 
@@ -285,7 +362,108 @@ def roll(bundle: Bundle, machine: machine_spec.MachineSpec, activate: bool, post
         configure_bootstrap_version(version)
 
 
-def wait(bundle: Bundle, machine: machine_spec.MachineSpec):
+def build(bundle: Bundle, machine: MachineSpec):
+    params = read_dependency_parameters({})
+
+    packages: list[Package] = [
+        ("zlib", PackageRole.LIBRARY, []),
+    ]
+
+    started_at = time.time()
+    sync_ended_at = None
+    build_ended_at = None
+    packaging_ended_at = None
+    try:
+        synchronize_repos(packages, params)
+        sync_ended_at = time.time()
+
+        build(packages, params, host_selector)
+        build_ended_at = time.time()
+
+        package(bundle_ids, params, host_selector)
+        packaging_ended_at = time.time()
+    except subprocess.CalledProcessError as e:
+        print(e, file=sys.stderr)
+        if e.stdout is not None:
+            print("\n=== stdout ===\n" + e.stdout, file=sys.stderr)
+        if e.stderr is not None:
+            print("\n=== stderr ===\n" + e.stderr, file=sys.stderr)
+        sys.exit(1)
+    finally:
+        ended_at = time.time()
+
+        if sync_ended_at is not None:
+            print("")
+            print("*** TIME SPENT")
+            print("")
+            print("      Total: {}".format(format_duration(ended_at - started_at)))
+
+        if sync_ended_at is not None:
+            print("       Sync: {}".format(format_duration(sync_ended_at - started_at)))
+
+        if build_ended_at is not None:
+            print("      Build: {}".format(format_duration(build_ended_at - sync_ended_at)))
+
+        if packaging_ended_at is not None:
+            print("  Packaging: {}".format(format_duration(packaging_ended_at - build_ended_at)))
+
+
+def synchronize_repos(packages: list[Package], params: DependencyParameters):
+    build_machine = MachineSpec.make_from_local_system()
+    cache_dir = detect_cache_dir(ROOT_DIR)
+
+    toolchain_prefix, toolchain_state = ensure_toolchain(build_machine, cache_dir)
+    if toolchain_state == SourceState.MODIFIED:
+        wipe_build_state()
+
+    #check_build_environment()
+
+    for name, _, _ in packages:
+        pkg_state = grab_and_prepare(name, params.get_package_spec(name), params)
+        if pkg_state == SourceState.MODIFIED:
+            wipe_build_state()
+
+
+def grab_and_prepare(name: str, spec: PackageSpec, params: DependencyParameters) -> SourceState:
+    assert spec.recipe == "meson" or name == "ninja"
+
+    source_dir = DEPS_DIR / name
+    if source_dir.exists():
+        if query_git_head(source_dir) == spec.version:
+            source_state = SourceState.PRISTINE
+        else:
+            print()
+            print("{name}: synchronizing".format(name=name), flush=True)
+            perform("git", "fetch", "-q", cwd=source_dir)
+            perform("git", "checkout", "-q", spec.version, cwd=source_dir)
+            source_state = SourceState.MODIFIED
+    else:
+        print()
+        print("{name}: cloning into deps\\{name}".format(name=name), flush=True)
+        DEPS_DIR.mkdir(parents=True, exist_ok=True)
+        perform("git", "clone", "-q", "--recurse-submodules", spec.url, name, cwd=DEPS_DIR)
+        perform("git", "checkout", "-q", spec.version, cwd=source_dir)
+        for name in spec.patches:
+            perform("git", "apply", RELENG_DIR / "patches" / name, cwd=source_dir)
+        source_state = SourceState.PRISTINE
+
+    return source_state
+
+
+def wipe_build_state():
+    pass
+    #print("*** Wiping build state", flush=True)
+    #locations = [
+    #    ("existing packages", get_prefix_root()),
+    #    ("build directories", get_tmp_root()),
+    #]
+    #for description, path in locations:
+    #    if path.exists():
+    #        print("Wiping", description, flush=True)
+    #        shutil.rmtree(path)
+
+
+def wait(bundle: Bundle, machine: MachineSpec):
     params = read_dependency_parameters()
     (url, filename, suffix) = compute_bundle_parameters(bundle, machine, params.deps_version)
 
@@ -347,7 +525,7 @@ def bump():
         print("")
 
 
-def compute_bundle_parameters(bundle: Bundle, machine: machine_spec.MachineSpec, version: str) -> Tuple[str, str, str]:
+def compute_bundle_parameters(bundle: Bundle, machine: MachineSpec, version: str) -> tuple[str, str, str]:
     if bundle == Bundle.TOOLCHAIN and machine.os == "windows":
         os_arch_config = "windows-x86"
     else:
@@ -358,7 +536,7 @@ def compute_bundle_parameters(bundle: Bundle, machine: machine_spec.MachineSpec,
     return (url, filename, suffix)
 
 
-def read_dependency_parameters(host_defines: Dict[str, str] = {}) -> DependencyParameters:
+def read_dependency_parameters(host_defines: dict[str, str] = {}) -> DependencyParameters:
     raw_params = host_defines.copy()
     for match in CONFIG_KEY_VALUE_PATTERN.finditer(DEPS_MK_PATH.read_text(encoding='utf-8')):
         key, value = match.group(1, 2)
@@ -397,11 +575,11 @@ def configure_bootstrap_version(version):
     DEPS_MK_PATH.write_bytes(deps_content.encode('utf-8'))
 
 
-def parse_string_value(v: str, raw_params: Dict[str, str]) -> str:
+def parse_string_value(v: str, raw_params: dict[str, str]) -> str:
     return CONFIG_VARIABLE_REF_PATTERN.sub(lambda match: raw_params.get(match.group(1), ""), v)
 
 
-def parse_array_value(v: str, raw_params: Dict[str, str]) -> List[str]:
+def parse_array_value(v: str, raw_params: dict[str, str]) -> list[str]:
     v = parse_string_value(v, raw_params)
     if v == "":
         return []

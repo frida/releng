@@ -7,9 +7,9 @@ import platform
 import shutil
 import subprocess
 import sys
-from typing import Callable, Literal, Optional, Sequence, Tuple
+from typing import Callable, Literal, Optional
 
-from . import deps, env_android, env_apple, env_generic, machine_file
+from . import env_android, env_apple, env_generic, machine_file
 from .machine_file import bool_to_meson, str_to_meson, strv_to_meson
 from .machine_spec import MachineSpec
 
@@ -37,26 +37,6 @@ def query_machine_file_path(machine: MachineSpec, flavor: str, build_dir: Path) 
 
 def enumerate_build_dirs(build_dir: Path):
     return build_dir.glob("tmp-*/*")
-
-
-def detect_machine() -> MachineSpec:
-    bos = detect_os()
-    config = "release" if bos == "windows" else None
-    return MachineSpec(bos, detect_arch(), config)
-
-
-def detect_os() -> str:
-    bos = platform.system().lower()
-    if bos == "darwin":
-        bos = "macos"
-    return bos
-
-
-def detect_arch() -> str:
-    arch = platform.machine().lower()
-    if arch == "amd64":
-        arch = "x86_64"
-    return arch
 
 
 def detect_default_prefix() -> Path:
@@ -219,44 +199,3 @@ def needs_exe_wrapper(machine: MachineSpec,
     if os.environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
         return False
     return machine != build_machine
-
-
-def query_toolchain_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
-            else machine.identifier
-    return deps_dir / f"toolchain-{identifier}"
-
-
-def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
-    toolchain_prefix = query_toolchain_prefix(machine, deps_dir)
-    deps.sync(deps.Bundle.TOOLCHAIN, machine, toolchain_prefix)
-    return toolchain_prefix
-
-
-def detect_toolchain_vala_compiler(toolchain_prefix: Path,
-                                   build_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
-    datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
-    if datadir is None:
-        return None
-
-    api_version = datadir.name.split("-", maxsplit=1)[1]
-
-    valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
-    vapidir = datadir / "vapi"
-    return (valac, vapidir)
-
-
-def query_sdk_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    if machine.os == "windows":
-        return deps_dir / "sdk-windows" / f"{machine.msvs_platform}-{machine.config.title()}"
-    return deps_dir / f"sdk-{machine.identifier}"
-
-
-def ensure_sdk(machine: MachineSpec, deps_dir: Path) -> Path:
-    sdk_prefix = query_sdk_prefix(machine, deps_dir)
-    if machine.os == "windows":
-        sdk_dir = sdk_prefix.parent
-    else:
-        sdk_dir = sdk_prefix
-    deps.sync(deps.Bundle.SDK, machine, sdk_dir)
-    return sdk_prefix

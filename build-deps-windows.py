@@ -21,7 +21,6 @@ if __name__ == "__main__":
     # TODO: Refactor
     sys.path.insert(0, str(ROOT_DIR))
 
-from releng.env import detect_machine
 from releng.deps import read_dependency_parameters, Bundle, DependencyParameters, PackageSpec
 from releng.machine_spec import MachineSpec
 from releng import winenv
@@ -155,7 +154,7 @@ cached_meson_params = {}
 cached_target_glib = None
 cached_bootstrap_valac = None
 
-build_machine = detect_machine()
+build_machine = MachineSpec.make_from_local_system()
 
 
 def main():

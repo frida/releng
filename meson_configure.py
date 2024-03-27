@@ -14,7 +14,8 @@ import mesonbuild.interpreter
 from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
         UserComboOption, UserFeatureOption, UserOption, UserStringOption
 
-from . import deps, env, machine_spec
+from . import deps, env
+from .machine_spec import MachineSpec
 
 
 def main():
@@ -41,11 +42,11 @@ def main():
     opts.add_argument("--build",
                       help="configure for building on BUILD",
                       metavar="BUILD",
-                      type=machine_spec.parse)
+                      type=MachineSpec.parse)
     opts.add_argument("--host",
                       help="cross-compile to build binaries to run on HOST",
                       metavar="HOST",
-                      type=machine_spec.parse)
+                      type=MachineSpec.parse)
     opts.add_argument("--enable-symbols",
                       help="build binaries with debug symbols included (default: disabled)",
                       action="store_true")
@@ -101,8 +102,8 @@ def main():
 def configure(sourcedir: Path,
               builddir: Path,
               prefix: Optional[str] = None,
-              build_machine: Optional[machine_spec.MachineSpec] = None,
-              host_machine: Optional[machine_spec.MachineSpec] = None,
+              build_machine: Optional[MachineSpec] = None,
+              host_machine: Optional[MachineSpec] = None,
               default_library: str = "static",
               allowed_prebuilds: Sequence[str] = None,
               meson: str = "internal",
@@ -111,7 +112,7 @@ def configure(sourcedir: Path,
         prefix = env.detect_default_prefix()
 
     if build_machine is None:
-        build_machine = env.detect_machine()
+        build_machine = MachineSpec.make_from_local_system()
 
     if host_machine is None:
         host_machine = build_machine
@@ -119,7 +120,7 @@ def configure(sourcedir: Path,
     if host_machine.os == "windows":
         vs_arch = os.environ.get("VSCMD_ARG_TGT_ARCH", None)
         if vs_arch == "x86":
-            host_machine = machine_spec.MachineSpec("windows", "x86", host_machine.config)
+            host_machine = MachineSpec("windows", "x86", host_machine.config)
         if build_machine.os == "windows" and build_machine.arch == "x86_64" and host_machine.arch == "x86":
             build_machine = host_machine
 
@@ -138,16 +139,12 @@ def configure(sourcedir: Path,
     ]
     extra_paths = []
 
-    raw_deps_dir = os.environ.get("FRIDA_DEPS", None)
-    if raw_deps_dir is not None:
-        deps_dir = Path(raw_deps_dir)
-    else:
-        deps_dir = sourcedir / "deps"
+    deps_dir = deps.detect_cache_dir(sourcedir)
 
     allow_prebuilt_toolchain = "toolchain" in allowed_prebuilds
     if allow_prebuilt_toolchain:
         try:
-            toolchain_prefix = env.ensure_toolchain(build_machine, deps_dir)
+            toolchain_prefix, _ = deps.ensure_toolchain(build_machine, deps_dir)
         except deps.BundleNotFoundError as e:
             print_toolchain_not_found_error(e)
             return 1
@@ -156,8 +153,8 @@ def configure(sourcedir: Path,
             return 2
     else:
         if project_depends_on_vala_compiler(sourcedir):
-            toolchain_prefix = env.query_toolchain_prefix(build_machine, deps_dir)
-            vala_compiler = env.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
+            toolchain_prefix = deps.query_toolchain_prefix(build_machine, deps_dir)
+            vala_compiler = deps.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
             if vala_compiler is None:
                 try:
                     build_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
@@ -178,7 +175,7 @@ def configure(sourcedir: Path,
         required.add("sdk:host")
     if allowed_prebuilds.issuperset(required):
         try:
-            build_sdk_prefix = env.ensure_sdk(build_machine, deps_dir)
+            build_sdk_prefix, _ = deps.ensure_sdk(build_machine, deps_dir)
         except deps.BundleNotFoundError as e:
             print_sdk_not_found_error(e)
             return 3
@@ -189,7 +186,7 @@ def configure(sourcedir: Path,
     host_sdk_prefix = None
     if is_cross_build and "sdk:host" in allowed_prebuilds:
         try:
-            host_sdk_prefix = env.ensure_sdk(host_machine, deps_dir)
+            host_sdk_prefix, _ = deps.ensure_sdk(host_machine, deps_dir)
         except deps.BundleNotFoundError as e:
             print_sdk_not_found_error(e)
             return 5
