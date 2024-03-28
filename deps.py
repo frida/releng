@@ -354,7 +354,7 @@ def build(bundle: Bundle, machine: MachineSpec):
         ("zlib", PackageRole.LIBRARY),
     ]
 
-    builder = DependencyBuilder(machine)
+    builder = DependencyBuilder(bundle, machine)
     try:
         builder.build(packages)
     except subprocess.CalledProcessError as e:
@@ -367,7 +367,8 @@ def build(bundle: Bundle, machine: MachineSpec):
 
 
 class DependencyBuilder:
-    def __init__(self, host_machine: MachineSpec):
+    def __init__(self, bundle: Bundle, host_machine: MachineSpec):
+        self._bundle = bundle
         self._build_machine = MachineSpec.make_from_local_system()
         self._host_machine = host_machine
         self._default_library = "static"
@@ -394,7 +395,7 @@ class DependencyBuilder:
                 self._build_package(name, role, self._params.get_package_spec(name))
             build_ended_at = time.time()
 
-            self._package(bundle_ids)
+            self._package()
             packaging_ended_at = time.time()
         finally:
             ended_at = time.time()
@@ -585,6 +586,101 @@ class DependencyBuilder:
 
     def _call_meson(self, argv, *args, **kwargs):
         return env.call_meson(argv, use_submodule=True, *args, **kwargs)
+
+    def _package(self):
+        with tempfile.TemporaryDirectory(prefix="frida-deps") as raw_tempdir:
+            tempdir = Path(raw_tempdir)
+
+            outfile = self._cachedir / f"{self._bundle.name.lower()}-{self._host_machine.identifier}.tar.bz2"
+            print("outfile:", str(outfile))
+
+            if self._bundle is Bundle.TOOLCHAIN:
+                self._stage_toolchain_files(tempdir)
+            else:
+                self._stage_sdk_files(tempdir)
+
+
+            toolchain_path = ROOT_DIR / "build" / "toolchain-windows-x86.exe"
+
+            sdk_paths = {}
+            for arch in host_selector.architectures:
+                for config in host_selector.configurations:
+                    sdk_paths[(arch, config)] = ROOT_DIR / "build" / f"sdk-windows-{arch}-{config}.exe"
+
+            print("About to assemble:")
+            if Bundle.TOOLCHAIN in bundle_ids:
+                print("\t* " + toolchain_path.name)
+            if Bundle.SDK in bundle_ids:
+                for sdk_path in sorted(sdk_paths.values()):
+                    print("\t* " + sdk_path.name)
+
+            print()
+            print("Determining what to include...", flush=True)
+
+            prefixes_dir = get_prefix_root()
+
+            toolchain_files = []
+            toolchain_mixin_files = []
+            if Bundle.TOOLCHAIN in bundle_ids:
+                for root, dirs, files in os.walk(get_prefix_path("x86", "release", "static")):
+                    relpath = PurePath(root).relative_to(prefixes_dir)
+                    all_files = [relpath / f for f in files]
+                    toolchain_files += [f for f in all_files if file_is_vala_toolchain_related(f) or \
+                            f.name in {"ninja.exe", "pkg-config.exe", "glib-genmarshal", "glib-mkenums"} or \
+                            f.parent.name == "manifest"]
+                toolchain_files.sort()
+
+                for root, dirs, files in os.walk(BOOTSTRAP_TOOLCHAIN_DIR):
+                    relpath = PurePath(root).relative_to(BOOTSTRAP_TOOLCHAIN_DIR)
+                    all_files = [relpath / f for f in files]
+                    toolchain_mixin_files += [f for f in all_files if not (file_is_vala_toolchain_related(f) or \
+                            f.parent.name == "manifest")]
+                toolchain_mixin_files.sort()
+
+            sdk_files = {}
+            if Bundle.SDK in bundle_ids:
+                for arch in host_selector.architectures:
+                    for config in host_selector.configurations:
+                        cur_files = []
+                        sdk_files[(arch, config)] = cur_files
+                        prefix_pattern = "-".join([arch, config, "static"])
+                        for prefix in prefixes_dir.glob(prefix_pattern):
+                            for root, dirs, files in os.walk(prefix):
+                                relpath = PurePath(root).relative_to(prefixes_dir)
+                                all_files = [relpath / f for f in files]
+                                cur_files += [f for f in all_files if file_is_sdk_related(f)]
+                            cur_files += [f.relative_to(prefixes_dir) for f in \
+                                    (prefix.parent / (prefix.name[:-7] + "-dynamic") / "lib").glob("**/*.a")]
+                        cur_files.sort()
+
+            print("Copying files...", flush=True)
+            if Bundle.TOOLCHAIN in bundle_ids:
+                toolchain_tempdir = tempdir / toolchain_path.stem
+                copy_files(BOOTSTRAP_TOOLCHAIN_DIR, toolchain_mixin_files, toolchain_tempdir)
+                copy_files(prefixes_dir, toolchain_files, toolchain_tempdir, transform_toolchain_dest)
+                fix_manifests(toolchain_tempdir)
+                (toolchain_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding="utf-8")
+
+            if Bundle.SDK in bundle_ids:
+                for (arch, config), sdk_path in sdk_paths.items():
+                    sdk_tempdir = tempdir / sdk_path.stem
+                    copy_files(prefixes_dir, sdk_files[(arch, config)], sdk_tempdir, transform_sdk_dest)
+                    fix_manifests(sdk_tempdir)
+                    (sdk_tempdir / "VERSION.txt").write_text(params.deps_version + "\n", encoding="utf-8")
+
+            print("Compressing...", flush=True)
+            compression_switches = ["a", "-mx{}".format(COMPRESSION_LEVEL), "-sfx7zCon.sfx"]
+
+            if Bundle.TOOLCHAIN in bundle_ids:
+                toolchain_path.unlink(missing_ok=True)
+                perform("7z", *compression_switches, "-r", toolchain_path, ".", cwd=toolchain_tempdir)
+
+            if Bundle.SDK in bundle_ids:
+                for (arch, config), sdk_path in sdk_paths.items():
+                    sdk_path.unlink(missing_ok=True)
+                    perform("7z", *compression_switches, "-r", sdk_path, ".", cwd=tempdir / sdk_path.stem)
+
+            print("All done.", flush=True)
 
     def _get_outdir(self) -> Path:
         return self._workdir / "_out"
