@@ -106,7 +106,7 @@ def main():
 
     command = subparsers.add_parser("build", help="build prebuilt dependencies")
     command.add_argument("bundle", help="bundle to roll", choices=bundle_choices)
-    command.add_argument("host", help="OS/arch")
+    command.add_argument("--host", help="OS/arch", default=MachineSpec.make_from_local_system().identifier)
     command.set_defaults(func=lambda args: build(Bundle[args.bundle.upper()], MachineSpec.parse(args.host)))
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
@@ -370,6 +370,7 @@ class DependencyBuilder:
     def __init__(self, host_machine: MachineSpec):
         self._build_machine = MachineSpec.make_from_local_system()
         self._host_machine = host_machine
+        self._default_library = "static"
 
         self._params = read_dependency_parameters({})
         self._cachedir = detect_cache_dir(ROOT_DIR)
@@ -424,10 +425,8 @@ class DependencyBuilder:
                                            host_machine=self._host_machine,
                                            host_sdk_prefix=None,
                                            toolchain_prefix=self._toolchain_prefix,
-                                           default_library="static",
-                                           call_selected_meson=lambda argv, *args, **kwargs: env.call_meson(argv,
-                                                                                                            use_submodule=True,
-                                                                                                            *args, **kwargs),
+                                           default_library=self._default_library,
+                                           call_selected_meson=self._call_meson,
                                            outdir=self._get_outdir())
         menv = {**os.environ, **machine_env}
         menv["PATH"] = os.pathsep.join(machine_paths) + os.pathsep + menv["PATH"]
@@ -443,30 +442,30 @@ class DependencyBuilder:
     def _grab_and_prepare(self, name: str, spec: PackageSpec) -> SourceState:
         assert spec.recipe == "meson" or name == "ninja"
 
-        repodir = self._workdir / name
-        if repodir.exists():
-            if query_git_head(repodir) == spec.version:
+        sourcedir = self._get_sourcedir(name)
+        if sourcedir.exists():
+            if query_git_head(sourcedir) == spec.version:
                 source_state = SourceState.PRISTINE
             else:
                 print()
                 print("{name}: synchronizing".format(name=name), flush=True)
                 perform("git", "fetch", "-q",
-                        cwd=repodir)
+                        cwd=sourcedir)
                 perform("git", "checkout", "-q", spec.version,
-                        cwd=repodir)
+                        cwd=sourcedir)
                 source_state = SourceState.MODIFIED
         else:
             print()
             print(f"{name}: cloning", flush=True)
-            repodir.parent.mkdir(parents=True, exist_ok=True)
-            perform("git", "clone", "-q", "--recurse-submodules", spec.url, repodir.name,
-                    cwd=repodir.parent)
+            sourcedir.parent.mkdir(parents=True, exist_ok=True)
+            perform("git", "clone", "-q", "--recurse-submodules", spec.url, sourcedir.name,
+                    cwd=sourcedir.parent)
             perform("git", "checkout", "-q", spec.version,
-                    cwd=repodir)
+                    cwd=sourcedir)
             for name in spec.patches:
                 # FIXME: If this fails and the build is restarted, we will end up skipping this part.
                 perform("git", "apply", RELENG_DIR / "patches" / name,
-                        cwd=repodir)
+                        cwd=sourcedir)
             source_state = SourceState.PRISTINE
 
         return source_state
@@ -539,42 +538,44 @@ class DependencyBuilder:
         manifest_path.write_text("bin/ninja.exe\n", encoding="utf-8")
 
     def _build_using_meson(self, name: str, runtime: str, spec: PackageSpec):
-        source_dir = DEPS_DIR / name
-        build_dir = env_dir / name
-        prefix = get_prefix_path(arch, config, runtime)
-        optimization = "s" if config == "release" else "0"
-        ndebug = "true" if config == "release" else "false"
+        sourcedir = self._get_sourcedir(name)
+        builddir = self._get_builddir(name, runtime)
 
-        if build_dir.exists():
-            shutil.rmtree(build_dir)
+        prefix = self._get_prefix(runtime)
+        if self._host_machine.config != "debug":
+            optimization = "s"
+            ndebug = "true"
+        else:
+            optimization = "0"
+            ndebug = "false"
 
-        perform(
-            sys.executable, MESON,
-            "setup",
-            build_dir,
-            "--prefix", prefix,
-            "--default-library", "static",
-            "--backend", "ninja",
-            "-Doptimization=" + optimization,
-            "-Db_ndebug=" + ndebug,
-            "-Db_vscrt=" + vscrt_from_configuration_and_runtime(config, runtime),
-            *spec.options,
-            *extra_options,
-            cwd=source_dir,
-            env=shell_env
-        )
+        if builddir.exists():
+            shutil.rmtree(builddir)
 
-        perform(NINJA, "install", cwd=build_dir, env=shell_env)
+        self._call_meson([
+                             "setup",
+                             builddir,
+                             f"--prefix={prefix}",
+                             f"--default-library={self._default_library}",
+                             f"--backend=ninja",
+                             f"-Doptimization={optimization}",
+                             f"-Db_ndebug={ndebug}",
+                             f"-Db_vscrt={vscrt_from_configuration_and_runtime(self._host_machine.config, runtime)}",
+                             *spec.options,
+                         ],
+                         cwd=sourcedir,
+                         env=self._machine_env)
+
+        self._call_meson(["install"],
+                         cwd=builddir,
+                         env=self._machine_env)
 
         manifest_lines = []
-        install_locations = json.loads(subprocess.check_output([
-                sys.executable, MESON,
-                "introspect",
-                "--installed"
-            ],
-            cwd=build_dir,
-            encoding="utf-8",
-            env=shell_env))
+        install_locations = json.loads(self._call_meson(["introspect", "--installed"],
+                                                        cwd=builddir,
+                                                        capture_output=True,
+                                                        encoding="utf-8",
+                                                        env=self._machine_env).stdout)
         for installed_path in install_locations.values():
             manifest_lines.append(Path(installed_path).relative_to(prefix).as_posix())
         manifest_lines.sort()
@@ -582,17 +583,36 @@ class DependencyBuilder:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
-    def _get_outdir(self):
+    def _call_meson(self, argv, *args, **kwargs):
+        return env.call_meson(argv, use_submodule=True, *args, **kwargs)
+
+    def _get_outdir(self) -> Path:
         return self._workdir / "_out"
 
+    def _get_sourcedir(self, name: str) -> Path:
+        return self._workdir / name
+
+    def _get_builddir(self, name: str, runtime: str) -> Path:
+        return self._workdir / "_build" / self._compute_output_id(runtime) / name
+
     def _get_prefix(self, runtime: str) -> Path:
+        return self._get_outdir() / self._compute_output_id(runtime)
+
+    def _compute_output_id(self, runtime: str) -> str:
         parts = [self._host_machine.identifier]
         if self._host_machine.os == "windows":
             parts += [runtime]
-        return self._get_outdir() / "-".join(parts)
+        return "-".join(parts)
 
     def _get_manifest_path(self, name: str, runtime: str) -> Path:
         return self._get_prefix(runtime) / "manifest" / f"{name}.pkg"
+
+
+def vscrt_from_configuration_and_runtime(config: str, runtime: str) -> str:
+    result = "md" if runtime == "dynamic" else "mt"
+    if config == "debug":
+        result += "d"
+    return result
 
 
 def wait(bundle: Bundle, machine: MachineSpec):
