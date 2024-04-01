@@ -244,7 +244,7 @@ options = [
 
 [libgee]
 name = "libgee"
-version = "b1db8f4e0ff72583e5f10205a6512befffa7b541"
+version = "ad17ed847039469fcc2dc711ecfee2bbf7d2bf87"
 url = "https://github.com/frida/libgee.git"
 options = [
     "-Ddisable-internal-asserts=true",
