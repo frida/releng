@@ -1,6 +1,7 @@
 from configparser import ConfigParser
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 from typing import Callable, Optional
@@ -126,7 +127,9 @@ def init_machine_config(machine: MachineSpec,
 
     common_flags += ARCH_COMMON_FLAGS.get(machine.arch, [])
     c_like_flags += ARCH_C_LIKE_FLAGS.get(machine.arch, [])
+    c_like_flags += read_envflags("CPPFLAGS")
     linker_flags += ARCH_LINKER_FLAGS.get(machine.arch, [])
+    linker_flags += read_envflags("LDFLAGS")
 
     if android_api < 24:
         cxx_like_flags += ["-D_LIBCPP_HAS_NO_OFF_T_FUNCTIONS"]
@@ -139,10 +142,14 @@ def init_machine_config(machine: MachineSpec,
     constants["cxx_link_flags"] = strv_to_meson(cxx_link_flags)
 
     options = config["built-in options"]
-    options["c_args"] = "c_like_flags"
-    options["cpp_args"] = "c_like_flags + cxx_like_flags"
+    options["c_args"] = "c_like_flags + " + strv_to_meson(read_envflags("CFLAGS"))
+    options["cpp_args"] = "c_like_flags + cxx_like_flags + " + strv_to_meson(read_envflags("CXXFLAGS"))
     options["c_link_args"] = "linker_flags"
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
+
+
+def read_envflags(name: str) -> list[str]:
+    return shlex.split(os.environ.get(name, ""))

@@ -1,5 +1,7 @@
 from configparser import ConfigParser
+import os
 from pathlib import Path
+import shlex
 import subprocess
 from typing import Callable, Optional
 
@@ -103,18 +105,21 @@ def init_machine_config(machine: MachineSpec,
     if machine.config is not None:
         target += "-" + machine.config
 
+    c_like_flags = read_envflags("CPPFLAGS")
+
     linker_flags = ["-Wl,-dead_strip"]
     if (clang_path.parent / "ld-classic").exists():
         # New linker links with libresolv even if we're not using any symbols from it,
         # at least as of Xcode 15.0 beta 7.
         linker_flags += ["-Wl,-ld_classic"]
+    linker_flags += read_envflags("LDFLAGS")
 
     constants = config["constants"]
     constants["common_flags"] = strv_to_meson([
         "-target", target,
         "-isysroot", sdk_path,
     ])
-    constants["c_like_flags"] = strv_to_meson([])
+    constants["c_like_flags"] = strv_to_meson(c_like_flags)
     constants["linker_flags"] = strv_to_meson(linker_flags)
 
     if use_static_libcxx:
@@ -133,10 +138,10 @@ def init_machine_config(machine: MachineSpec,
         constants["cxx_link_flags"] = strv_to_meson([])
 
     options = config["built-in options"]
-    options["c_args"] = "c_like_flags"
-    options["cpp_args"] = "c_like_flags + cxx_like_flags"
-    options["objc_args"] = "c_like_flags"
-    options["objcpp_args"] = "c_like_flags + cxx_like_flags"
+    options["c_args"] = "c_like_flags + " + strv_to_meson(read_envflags("CFLAGS"))
+    options["cpp_args"] = "c_like_flags + cxx_like_flags + " + strv_to_meson(read_envflags("CXXFLAGS"))
+    options["objc_args"] = "c_like_flags + " + strv_to_meson(read_envflags("OBJCFLAGS"))
+    options["objcpp_args"] = "c_like_flags + cxx_like_flags + " + strv_to_meson(read_envflags("OBJCXXFLAGS"))
     options["c_link_args"] = "linker_flags"
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["objc_link_args"] = "linker_flags"
@@ -144,3 +149,7 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
+
+
+def read_envflags(name: str) -> list[str]:
+    return shlex.split(os.environ.get(name, ""))
