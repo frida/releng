@@ -71,7 +71,7 @@ options = [
 [selinux]
 when = "machine.os == 'android'"
 name = "SELinux Userspace"
-version = "7d03ec4cd2e08e3bb0c2390a6e68beb3978e2816"
+version = "6d5513fd8069e9ff9b7aa10970d34457b32970c8"
 url = "https://github.com/frida/selinux.git"
 options = [
     "-Dregex=disabled",
