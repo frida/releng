@@ -158,7 +158,7 @@ dependencies = [
 
 [sqlite]
 name = "SQLite"
-version = "87e0535610825f01a033948ba24bbe82db108470"
+version = "9337327a50008f2d2236112ccb6f44059b1bafbd"
 url = "https://github.com/frida/sqlite.git"
 
 [libunwind]
