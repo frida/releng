@@ -52,7 +52,7 @@ url = "https://github.com/frida/zlib.git"
 
 [libffi]
 name = "libffi"
-version = "938b07aa8280bcc4f92f08a0fdbb4ad81024bde0"
+version = "10bcbcc6295e559b7c952b054e7669a912d3ce06"
 url = "https://github.com/frida/libffi.git"
 options = [
     "-Dexe_static_tramp=false",
