@@ -136,7 +136,7 @@ options = [
 
 [brotli]
 name = "Brotli"
-version = "9f51b6b95599466f46678381492834cdbde018f7"
+version = "01d9e2922ca878965ebcd71ee8965d2a7aadb47a"
 url = "https://github.com/frida/brotli.git"
 
 [minizip]
