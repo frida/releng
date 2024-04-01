@@ -270,7 +270,7 @@ dependencies = [
 
 [libpsl]
 name = "libpsl"
-version = "579d32b7daf5a0ab1d1fef2d7e15066f52d8d026"
+version = "b76c0fed2e27353d5fbb067ecdfdf76d2281eb91"
 url = "https://github.com/frida/libpsl.git"
 options = [
     "-Druntime=no",
