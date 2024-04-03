@@ -365,7 +365,7 @@ version = "9dd243646cd11180625433c748e914768d9863f4"
 url = "https://github.com/frida/openssl.git"
 options = [
     "-Dcli=disabled",
-    { value = "-Dasm=disabled", when = "machine.config == 'mingw32'" }
+    { value = "-Dasm=disabled", when = "machine.config == 'mingw'" }
 ]
 
 [v8]

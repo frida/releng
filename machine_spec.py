@@ -116,7 +116,7 @@ class MachineSpec:
                 if system.startswith("musl"):
                     config = "musl"
                 elif kernel == "w64":
-                    config = "mingw64" if arch == "x86_64" else "mingw32"
+                    config = "mingw"
 
                 return MachineSpec(os, arch, config, raw_spec)
 
