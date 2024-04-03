@@ -242,7 +242,7 @@ def sync(bundle: Bundle,
             shutil.rmtree(staging_dir)
         staging_dir.mkdir(parents=True)
 
-        with tarfile.open(archive_path, "r:bz2") as tar:
+        with tarfile.open(archive_path, "r:xz") as tar:
             tar.extractall(staging_dir)
 
         suffix_len = len(".frida.in")
@@ -645,7 +645,7 @@ class Builder:
         return env.call_meson(argv, use_submodule=True, *args, **kwargs)
 
     def _package(self):
-        outfile = self._cachedir / f"{self._bundle.name.lower()}-{self._host_machine.identifier}.tar.bz2"
+        outfile = self._cachedir / f"{self._bundle.name.lower()}-{self._host_machine.identifier}.tar.xz"
 
         with tempfile.TemporaryDirectory(prefix="frida-deps") as raw_tempdir:
             tempdir = Path(raw_tempdir)
@@ -662,7 +662,7 @@ class Builder:
             (tempdir / "VERSION.txt").write_text(self._params.deps_version + "\n", encoding="utf-8")
 
             self._print_status(outfile.name, "Assembling")
-            with tarfile.open(outfile, "w:bz2") as tar:
+            with tarfile.open(outfile, "w:xz") as tar:
                 tar.add(tempdir, ".")
 
             self._print_status(outfile.name, "All done")
@@ -892,7 +892,7 @@ def compute_bundle_parameters(bundle: Bundle,
         os_arch_config = "windows-x86"
     else:
         os_arch_config = machine.identifier
-    filename = f"{bundle.name.lower()}-{os_arch_config}.tar.bz2"
+    filename = f"{bundle.name.lower()}-{os_arch_config}.tar.xz"
     url = BUNDLE_URL.format(version=version, filename=filename)
     return (url, filename)
 

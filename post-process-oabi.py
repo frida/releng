@@ -9,7 +9,7 @@ import tempfile
 import urllib.request
 
 
-ARM64E_URL = "https://build.frida.re/deps/{version}/sdk-ios-arm64e.tar.bz2"
+ARM64E_URL = "https://build.frida.re/deps/{version}/sdk-ios-arm64e.tar.xz"
 
 
 class CommandError(Exception):
@@ -33,29 +33,29 @@ def main():
 
     print(f"Downloading {arm64e_sdk_url}")
     with urllib.request.urlopen(arm64e_sdk_url) as response, \
-            tempfile.NamedTemporaryFile(suffix=".tar.bz2") as archive:
+            tempfile.NamedTemporaryFile(suffix=".tar.xz") as archive:
         shutil.copyfileobj(response, archive)
         arm64e_artifact_path = Path(archive.name)
 
         with tempfile.TemporaryDirectory() as patched_artifact_dir:
-            patched_artifact_file = Path(patched_artifact_dir) / "patched.tar.bz2"
+            patched_artifact_file = Path(patched_artifact_dir) / "patched.tar.xz"
 
             with tempfile.TemporaryDirectory() as artifact_extracted_dir, \
                     tempfile.TemporaryDirectory() as arm64e_extracted_dir:
                 artifact_extracted_path = Path(artifact_extracted_dir)
                 arm64e_extracted_path = Path(arm64e_extracted_dir)
 
-                with tarfile.open(arm64e_artifact_path, "r:bz2") as arm64e_tar:
+                with tarfile.open(arm64e_artifact_path, "r:xz") as arm64e_tar:
                     arm64e_tar.extractall(arm64e_extracted_path)
 
                     artifact_path = Path(args.artifact)
-                    with tarfile.open(artifact_path, "r:bz2") as tar:
+                    with tarfile.open(artifact_path, "r:xz") as tar:
                         tar.extractall(artifact_extracted_path)
 
                         print("Patching libffi.a...")
                         steal_object(artifact_extracted_path / "lib" / "libffi.a",
                                      arm64e_extracted_path / "lib" / "libffi.a")
-                        with tarfile.open(patched_artifact_file, "w:bz2") as patched_tar:
+                        with tarfile.open(patched_artifact_file, "w:xz") as patched_tar:
                             patched_tar.add(artifact_extracted_path, arcname="./")
 
             print(f"Overwriting {artifact_path}")
