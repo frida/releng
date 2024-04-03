@@ -155,6 +155,10 @@ def generate_machine_config(machine: MachineSpec,
         toolchain_bindir = toolchain_prefix / "bin"
         exe_suffix = build_machine.executable_suffix
 
+        ninja_binary = toolchain_bindir / f"ninja{exe_suffix}"
+        if ninja_binary.exists():
+            machine_env["NINJA"] = str(ninja_binary)
+
         for (tool_name, filename_suffix) in {("gdbus-codegen", ""),
                                              ("gio-querymodules", exe_suffix),
                                              ("glib-compile-resources", exe_suffix),
