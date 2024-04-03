@@ -153,6 +153,43 @@ def parse_set_option_value(v: str) -> set[str]:
     return set([v.strip() for v in v.split(",")])
 
 
+def query_toolchain_prefix(machine: MachineSpec,
+                           cache_dir: Path) -> Path:
+    identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
+            else machine.identifier
+    return cache_dir / f"toolchain-{identifier}"
+
+
+def ensure_toolchain(machine: MachineSpec,
+                     cache_dir: Path,
+                     version: Optional[str] = None) -> tuple[Path, SourceState]:
+    toolchain_prefix = query_toolchain_prefix(machine, cache_dir)
+    state = sync(Bundle.TOOLCHAIN, machine, toolchain_prefix, version)
+    return (toolchain_prefix, state)
+
+
+def query_sdk_prefix(machine: MachineSpec,
+                     cache_dir: Path) -> Path:
+    return cache_dir / f"sdk-{machine.identifier}"
+
+
+def ensure_sdk(machine: MachineSpec,
+               cache_dir: Path,
+               version: Optional[str] = None) -> tuple[Path, SourceState]:
+    sdk_prefix = query_sdk_prefix(machine, cache_dir)
+    state = sync(Bundle.SDK, machine, sdk_prefix, version)
+    return (sdk_prefix, state)
+
+
+def detect_cache_dir(sourcedir: Path) -> Path:
+    raw_location = os.environ.get("FRIDA_DEPS", None)
+    if raw_location is not None:
+        location = Path(raw_location)
+    else:
+        location = sourcedir / "deps"
+    return location
+
+
 def sync(bundle: Bundle,
          machine: MachineSpec,
          location: Path,

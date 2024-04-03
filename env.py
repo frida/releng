@@ -220,18 +220,6 @@ def needs_exe_wrapper(machine: MachineSpec,
     return machine != build_machine
 
 
-def query_toolchain_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
-            else machine.identifier
-    return deps_dir / f"toolchain-{identifier}"
-
-
-def ensure_toolchain(machine: MachineSpec, deps_dir: Path) -> Path:
-    toolchain_prefix = query_toolchain_prefix(machine, deps_dir)
-    deps.sync(deps.Bundle.TOOLCHAIN, machine, toolchain_prefix)
-    return toolchain_prefix
-
-
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
                                    build_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
     datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
@@ -243,19 +231,3 @@ def detect_toolchain_vala_compiler(toolchain_prefix: Path,
     valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
     vapidir = datadir / "vapi"
     return (valac, vapidir)
-
-
-def query_sdk_prefix(machine: MachineSpec, deps_dir: Path) -> Path:
-    if machine.os == "windows":
-        return deps_dir / "sdk-windows" / f"{machine.msvs_platform}-{machine.config.title()}"
-    return deps_dir / f"sdk-{machine.identifier}"
-
-
-def ensure_sdk(machine: MachineSpec, deps_dir: Path) -> Path:
-    sdk_prefix = query_sdk_prefix(machine, deps_dir)
-    if machine.os == "windows":
-        sdk_dir = sdk_prefix.parent
-    else:
-        sdk_dir = sdk_prefix
-    deps.sync(deps.Bundle.SDK, machine, sdk_dir)
-    return sdk_prefix

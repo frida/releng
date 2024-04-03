@@ -138,16 +138,12 @@ def configure(sourcedir: Path,
     ]
     extra_paths = []
 
-    raw_deps_dir = os.environ.get("FRIDA_DEPS", None)
-    if raw_deps_dir is not None:
-        deps_dir = Path(raw_deps_dir)
-    else:
-        deps_dir = sourcedir / "deps"
+    deps_dir = deps.detect_cache_dir(sourcedir)
 
     allow_prebuilt_toolchain = "toolchain" in allowed_prebuilds
     if allow_prebuilt_toolchain:
         try:
-            toolchain_prefix = env.ensure_toolchain(build_machine, deps_dir)
+            toolchain_prefix, _ = deps.ensure_toolchain(build_machine, deps_dir)
         except deps.BundleNotFoundError as e:
             print_toolchain_not_found_error(e)
             return 1
@@ -156,8 +152,8 @@ def configure(sourcedir: Path,
             return 2
     else:
         if project_depends_on_vala_compiler(sourcedir):
-            toolchain_prefix = env.query_toolchain_prefix(build_machine, deps_dir)
-            vala_compiler = env.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
+            toolchain_prefix = deps.query_toolchain_prefix(build_machine, deps_dir)
+            vala_compiler = deps.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
             if vala_compiler is None:
                 try:
                     build_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
@@ -178,7 +174,7 @@ def configure(sourcedir: Path,
         required.add("sdk:host")
     if allowed_prebuilds.issuperset(required):
         try:
-            build_sdk_prefix = env.ensure_sdk(build_machine, deps_dir)
+            build_sdk_prefix, _ = deps.ensure_sdk(build_machine, deps_dir)
         except deps.BundleNotFoundError as e:
             print_sdk_not_found_error(e)
             return 3
@@ -189,7 +185,7 @@ def configure(sourcedir: Path,
     host_sdk_prefix = None
     if is_cross_build and "sdk:host" in allowed_prebuilds:
         try:
-            host_sdk_prefix = env.ensure_sdk(host_machine, deps_dir)
+            host_sdk_prefix, _ = deps.ensure_sdk(host_machine, deps_dir)
         except deps.BundleNotFoundError as e:
             print_sdk_not_found_error(e)
             return 5
