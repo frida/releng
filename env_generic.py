@@ -71,72 +71,6 @@ ARCH_C_LIKE_FLAGS_UNIX = {
     ],
 }
 
-# Based on mesonbuild/envconfig.py and mesonbuild/compilers/compilers.py
-TOOLCHAIN_ENVVARS = {
-    # Compilers
-    "CC",
-    "CXX",
-    "CSC",
-    "CYTHON",
-    "DC",
-    "FC",
-    "OBJC",
-    "OBJCXX",
-    "RUSTC",
-    "VALAC",
-    "NASM",
-
-    # Linkers
-    "CC_LD",
-    "CXX_LD",
-    "DC_LD",
-    "FC_LD",
-    "OBJC_LD",
-    "OBJCXX_LD",
-    "RUSTC_LD",
-
-    # Binutils
-    "AR",
-    "AS",
-    "LD",
-    "NM",
-    "OBJCOPY",
-    "OBJDUMP",
-    "RANLIB",
-    "READELF",
-    "SIZE",
-    "STRINGS",
-    "STRIP",
-    "WINDRES",
-
-    # Other tools
-    "CMAKE",
-    "QMAKE",
-    "PKG_CONFIG",
-    "MAKE",
-    "VAPIGEN",
-    "LLVM_CONFIG",
-
-    # Deprecated
-    "D_LD",
-    "F_LD",
-    "RUST_LD",
-    "OBJCPP_LD",
-
-    # Flags
-    "CFLAGS",
-    "CXXFLAGS",
-    "CUFLAGS",
-    "OBJCFLAGS",
-    "OBJCXXFLAGS",
-    "FFLAGS",
-    "DFLAGS",
-    "VALAFLAGS",
-    "RUSTFLAGS",
-    "CYTHONFLAGS",
-    "CSFLAGS",
-}
-
 GCC_TOOL_IDS = [
     "c",
     "cpp",
@@ -223,13 +157,9 @@ def init_machine_config(machine: MachineSpec,
                     "--endian", machine.endian,
                 ]
 
-            meson_env = {**environ}
-            if is_cross_build and machine == build_machine:
-                meson_env = {build_envvar_to_host(k): v for k, v in meson_env.items() if k not in TOOLCHAIN_ENVVARS}
-
             process = call_selected_meson(argv,
                                           cwd=raw_prober_dir,
-                                          env=meson_env,
+                                          env=environ,
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.STDOUT,
                                           encoding="utf-8")
@@ -366,12 +296,6 @@ def init_machine_config(machine: MachineSpec,
     constants["cxx_link_flags"] = strv_to_meson(cxx_link_flags)
 
     return (machine_path, machine_env)
-
-
-def build_envvar_to_host(name: str) -> str:
-    if name.endswith("_FOR_BUILD"):
-        return name[:-10]
-    return name
 
 
 def resolve_gcc_binaries(toolprefix: str = "") -> tuple[list[str], dict[str, str]]:

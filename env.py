@@ -56,6 +56,11 @@ def generate_machine_files(build_machine: MachineSpec,
                            outdir: Path):
     is_cross_build = host_machine != build_machine
 
+    if is_cross_build:
+        build_environ = {build_envvar_to_host(k): v for k, v in environ.items() if k not in TOOLCHAIN_ENVVARS}
+    else:
+        build_environ = environ
+
     build_config, build_machine_path, build_machine_env = \
             generate_machine_config(build_machine,
                                     build_sdk_prefix,
@@ -63,7 +68,7 @@ def generate_machine_files(build_machine: MachineSpec,
                                     is_cross_build,
                                     toolchain_prefix,
                                     default_library,
-                                    environ,
+                                    build_environ,
                                     call_selected_meson)
 
     if is_cross_build:
@@ -217,3 +222,76 @@ def detect_toolchain_vala_compiler(toolchain_prefix: Path,
     valac = toolchain_prefix / "bin" / f"valac-{api_version}{build_machine.executable_suffix}"
     vapidir = datadir / "vapi"
     return (valac, vapidir)
+
+
+def build_envvar_to_host(name: str) -> str:
+    if name.endswith("_FOR_BUILD"):
+        return name[:-10]
+    return name
+
+
+# Based on mesonbuild/envconfig.py and mesonbuild/compilers/compilers.py
+TOOLCHAIN_ENVVARS = {
+    # Compilers
+    "CC",
+    "CXX",
+    "CSC",
+    "CYTHON",
+    "DC",
+    "FC",
+    "OBJC",
+    "OBJCXX",
+    "RUSTC",
+    "VALAC",
+    "NASM",
+
+    # Linkers
+    "CC_LD",
+    "CXX_LD",
+    "DC_LD",
+    "FC_LD",
+    "OBJC_LD",
+    "OBJCXX_LD",
+    "RUSTC_LD",
+
+    # Binutils
+    "AR",
+    "AS",
+    "LD",
+    "NM",
+    "OBJCOPY",
+    "OBJDUMP",
+    "RANLIB",
+    "READELF",
+    "SIZE",
+    "STRINGS",
+    "STRIP",
+    "WINDRES",
+
+    # Other tools
+    "CMAKE",
+    "QMAKE",
+    "PKG_CONFIG",
+    "MAKE",
+    "VAPIGEN",
+    "LLVM_CONFIG",
+
+    # Deprecated
+    "D_LD",
+    "F_LD",
+    "RUST_LD",
+    "OBJCPP_LD",
+
+    # Flags
+    "CFLAGS",
+    "CXXFLAGS",
+    "CUFLAGS",
+    "OBJCFLAGS",
+    "OBJCXXFLAGS",
+    "FFLAGS",
+    "DFLAGS",
+    "VALAFLAGS",
+    "RUSTFLAGS",
+    "CYTHONFLAGS",
+    "CSFLAGS",
+}
