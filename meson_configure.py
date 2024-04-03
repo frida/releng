@@ -224,7 +224,9 @@ def configure(sourcedir: Path,
         in_tree = (sourcedir / "Makefile").read_text(encoding="utf-8")
         out_of_tree = in_tree \
                 .replace('"$(shell pwd)"', shlex.quote(str(sourcedir))) \
-                .replace('./build', ".")
+                .replace("./build", ".") \
+                .replace("releng/meson/meson.py",
+                         shlex.quote(str(sourcedir / "releng" / "meson" / "meson.py")))
         makefile_path.write_text(out_of_tree)
 
         if platform.system() == "Windows":
