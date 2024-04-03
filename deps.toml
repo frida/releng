@@ -8,12 +8,6 @@ name = "Ninja"
 version = "516800b093d1a2e5589ee1cdd7393dffdf9c702e"
 url = "https://github.com/frida/ninja.git"
 
-[termux-elf-cleaner]
-scope = "toolchain"
-name = "termux-elf-cleaner"
-version = "c30d16bc119dae547c51c16e1cab37b08e240f6a"
-url = "https://github.com/frida/termux-elf-cleaner.git"
-
 [pkg-config]
 scope = "toolchain"
 name = "pkg-config"
