@@ -9,7 +9,7 @@ import subprocess
 import sys
 from typing import Callable, Literal, Optional, Sequence, Tuple
 
-from . import deps, env_android, env_apple, env_generic, machine_file
+from . import env_android, env_apple, env_generic, machine_file
 from .machine_file import bool_to_meson, str_to_meson, strv_to_meson
 from .machine_spec import MachineSpec
 
@@ -37,26 +37,6 @@ def query_machine_file_path(machine: MachineSpec, flavor: str, build_dir: Path) 
 
 def enumerate_build_dirs(build_dir: Path):
     return build_dir.glob("tmp-*/*")
-
-
-def detect_machine() -> MachineSpec:
-    bos = detect_os()
-    config = "release" if bos == "windows" else None
-    return MachineSpec(bos, detect_arch(), config)
-
-
-def detect_os() -> str:
-    bos = platform.system().lower()
-    if bos == "darwin":
-        bos = "macos"
-    return bos
-
-
-def detect_arch() -> str:
-    arch = platform.machine().lower()
-    if arch == "amd64":
-        arch = "x86_64"
-    return arch
 
 
 def detect_default_prefix() -> Path:

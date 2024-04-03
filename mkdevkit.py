@@ -14,7 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("kit")
     parser.add_argument("machine",
-                        type=machine_spec.parse)
+                        type=machine_spec.MachineSpec.parse)
     parser.add_argument("outdir",
                         type=Path)
     parser.add_argument("-t", "--thin",

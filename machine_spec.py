@@ -1,4 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass
+import platform
 import re
 from typing import Optional
 
@@ -75,6 +77,58 @@ class MachineSpec:
     arch: str
     config: Optional[str] = None
     triplet: Optional[str] = None
+
+    @staticmethod
+    def make_from_local_system() -> MachineSpec:
+        bos = detect_os()
+        config = "release" if bos == "windows" else None
+        return MachineSpec(bos, detect_arch(), config)
+
+    @staticmethod
+    def parse(raw_spec):
+        tokens = raw_spec.split("-")
+
+        if len(tokens) in {3, 4}:
+            arch = tokens[0]
+            m = TARGET_TRIPLET_ARCH_PATTERN.match(arch)
+            if m is not None:
+                kernel = tokens[-2]
+                system = tokens[-1]
+
+                if kernel == "w64":
+                    os = "windows"
+                elif kernel == "nto":
+                    os = "qnx"
+                else:
+                    os = kernel
+
+                if arch[0] == "i":
+                    arch = "x86"
+                elif arch == "arm":
+                    if system == "gnueabihf":
+                        arch = "armhf"
+                    elif os == "qnx" and system.endswith("eabi"):
+                        arch = "armeabi"
+                elif arch == "aarch64":
+                    arch = "arm64"
+
+                config = None
+                if system.startswith("musl"):
+                    config = "musl"
+                elif kernel == "w64":
+                    config = "mingw64" if arch == "x86_64" else "mingw32"
+
+                return MachineSpec(os, arch, config, raw_spec)
+
+        os, arch, *rest = tokens
+        if len(rest) != 0:
+            config = rest[0].lower()
+        else:
+            if os == "windows":
+                config = "release"
+            else:
+                config = None
+        return MachineSpec(os, arch, config)
 
     @property
     def identifier(self) -> str:
@@ -165,47 +219,15 @@ class MachineSpec:
         return False
 
 
-def parse(raw_spec):
-    tokens = raw_spec.split("-")
+def detect_os() -> str:
+    bos = platform.system().lower()
+    if bos == "darwin":
+        bos = "macos"
+    return bos
 
-    if len(tokens) in {3, 4}:
-        arch = tokens[0]
-        m = TARGET_TRIPLET_ARCH_PATTERN.match(arch)
-        if m is not None:
-            kernel = tokens[-2]
-            system = tokens[-1]
 
-            if kernel == "w64":
-                os = "windows"
-            elif kernel == "nto":
-                os = "qnx"
-            else:
-                os = kernel
-
-            if arch[0] == "i":
-                arch = "x86"
-            elif arch == "arm":
-                if system == "gnueabihf":
-                    arch = "armhf"
-                elif os == "qnx" and system.endswith("eabi"):
-                    arch = "armeabi"
-            elif arch == "aarch64":
-                arch = "arm64"
-
-            config = None
-            if system.startswith("musl"):
-                config = "musl"
-            elif kernel == "w64":
-                config = "mingw64" if arch == "x86_64" else "mingw32"
-
-            return MachineSpec(os, arch, config, raw_spec)
-
-    os, arch, *rest = tokens
-    if len(rest) != 0:
-        config = rest[0].lower()
-    else:
-        if os == "windows":
-            config = "release"
-        else:
-            config = None
-    return MachineSpec(os, arch, config)
+def detect_arch() -> str:
+    arch = platform.machine().lower()
+    if arch == "amd64":
+        arch = "x86_64"
+    return arch
