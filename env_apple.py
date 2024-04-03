@@ -1,5 +1,4 @@
 from configparser import ConfigParser
-import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -57,6 +56,7 @@ def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
                         is_cross_build: bool,
+                        environ: dict[str, str],
                         call_selected_meson: Callable,
                         config: ConfigParser):
     machine_path = []
@@ -105,6 +105,8 @@ def init_machine_config(machine: MachineSpec,
     if machine.config is not None:
         target += "-" + machine.config
 
+    read_envflags = lambda name: shlex.split(environ.get(name, ""))
+
     c_like_flags = read_envflags("CPPFLAGS")
 
     linker_flags = ["-Wl,-dead_strip"]
@@ -149,7 +151,3 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
-
-
-def read_envflags(name: str) -> list[str]:
-    return shlex.split(os.environ.get(name, ""))

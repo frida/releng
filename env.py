@@ -51,6 +51,7 @@ def generate_machine_files(build_machine: MachineSpec,
                            host_sdk_prefix: Optional[Path],
                            toolchain_prefix: Optional[Path],
                            default_library: DefaultLibrary,
+                           environ: dict[str, str],
                            call_selected_meson: Callable,
                            outdir: Path):
     is_cross_build = host_machine != build_machine
@@ -62,6 +63,7 @@ def generate_machine_files(build_machine: MachineSpec,
                                     is_cross_build,
                                     toolchain_prefix,
                                     default_library,
+                                    environ,
                                     call_selected_meson)
 
     if is_cross_build:
@@ -72,6 +74,7 @@ def generate_machine_files(build_machine: MachineSpec,
                                         is_cross_build,
                                         toolchain_prefix,
                                         default_library,
+                                        environ,
                                         call_selected_meson)
     else:
         host_config = None
@@ -108,13 +111,14 @@ def generate_machine_config(machine: MachineSpec,
                             is_cross_build: bool,
                             toolchain_prefix: Optional[Path],
                             default_library: DefaultLibrary,
+                            environ: dict[str, str],
                             call_selected_meson: Callable) -> Optional[str]:
     config = ConfigParser(dict_type=OrderedDict)
     config["constants"] = OrderedDict()
     config["binaries"] = OrderedDict()
     config["built-in options"] = OrderedDict()
     config["properties"] = OrderedDict([
-        ("needs_exe_wrapper", bool_to_meson(needs_exe_wrapper(machine, build_machine))),
+        ("needs_exe_wrapper", bool_to_meson(needs_exe_wrapper(machine, build_machine, environ))),
     ])
     config["host_machine"] = OrderedDict([
         ("system", str_to_meson(machine.system)),
@@ -136,6 +140,7 @@ def generate_machine_config(machine: MachineSpec,
                                                          sdk_prefix,
                                                          build_machine,
                                                          is_cross_build,
+                                                         environ,
                                                          call_selected_meson,
                                                          config)
 
@@ -194,8 +199,9 @@ def generate_machine_config(machine: MachineSpec,
 
 
 def needs_exe_wrapper(machine: MachineSpec,
-                      build_machine: MachineSpec) -> bool:
-    if os.environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
+                      build_machine: MachineSpec,
+                      environ: dict[str, str]) -> bool:
+    if environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
         return False
     return machine != build_machine
 

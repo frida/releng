@@ -199,7 +199,8 @@ def configure(sourcedir: Path,
                 env.generate_machine_files(build_machine, build_sdk_prefix,
                                            host_machine, host_sdk_prefix,
                                            toolchain_prefix, default_library,
-                                           call_selected_meson, builddir)
+                                           os.environ, call_selected_meson,
+                                           builddir)
     except Exception as e:
         print(f"Unable to generate machine files: {e}", file=sys.stderr)
         return 7

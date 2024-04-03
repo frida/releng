@@ -1,6 +1,5 @@
 from collections import OrderedDict
 from configparser import ConfigParser
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -171,6 +170,7 @@ def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
                         is_cross_build: bool,
+                        environ: dict[str, str],
                         call_selected_meson: Callable,
                         config: ConfigParser):
     machine_path = []
@@ -223,7 +223,7 @@ def init_machine_config(machine: MachineSpec,
                     "--endian", machine.endian,
                 ]
 
-            meson_env = {**os.environ}
+            meson_env = {**environ}
             if is_cross_build and machine == build_machine:
                 meson_env = {build_envvar_to_host(k): v for k, v in meson_env.items() if k not in TOOLCHAIN_ENVVARS}
 
@@ -290,8 +290,8 @@ def init_machine_config(machine: MachineSpec,
 
             machine_path += winenv.detect_msvs_runtime_path(machine, build_machine)
         elif machine != build_machine \
-                and "CC" not in os.environ \
-                and "CFLAGS" not in os.environ \
+                and "CC" not in environ \
+                and "CFLAGS" not in environ \
                 and machine.os == build_machine.os \
                 and machine.os == "linux" \
                 and machine.pointer_size == 4 \

@@ -1,5 +1,4 @@
 from configparser import ConfigParser
-import os
 from pathlib import Path
 import shlex
 from typing import Callable, Optional
@@ -59,6 +58,7 @@ def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
                         is_cross_build: bool,
+                        environ: dict[str, str],
                         call_selected_meson: Callable,
                         config: ConfigParser):
     machine_path = []
@@ -66,7 +66,7 @@ def init_machine_config(machine: MachineSpec,
 
     ndk_found = False
     try:
-        ndk_root = Path(os.environ["ANDROID_NDK_ROOT"])
+        ndk_root = Path(environ["ANDROID_NDK_ROOT"])
         if ndk_root.is_absolute():
             ndk_props_file = ndk_root / "source.properties"
             ndk_found = ndk_props_file.exists()
@@ -123,6 +123,8 @@ def init_machine_config(machine: MachineSpec,
         "-Wl,--gc-sections",
     ]
 
+    read_envflags = lambda name: shlex.split(environ.get(name, ""))
+
     common_flags += ARCH_COMMON_FLAGS.get(machine.arch, [])
     c_like_flags += ARCH_C_LIKE_FLAGS.get(machine.arch, [])
     c_like_flags += read_envflags("CPPFLAGS")
@@ -147,7 +149,3 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
-
-
-def read_envflags(name: str) -> list[str]:
-    return shlex.split(os.environ.get(name, ""))

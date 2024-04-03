@@ -466,6 +466,7 @@ class Builder:
                                            host_sdk_prefix=None,
                                            toolchain_prefix=self._toolchain_prefix,
                                            default_library=self._default_library,
+                                           environ=os.environ,
                                            call_selected_meson=self._call_meson,
                                            outdir=self._get_builddir_container())
         menv = {**os.environ, **machine_env}
