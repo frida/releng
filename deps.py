@@ -565,6 +565,8 @@ class Builder:
             optimization = "0"
             ndebug = "false"
 
+        strip = "true" if host_machine.toolchain_can_strip else "false"
+
         if builddir.exists():
             shutil.rmtree(builddir)
 
@@ -583,7 +585,7 @@ class Builder:
                              f"-Dbackend=ninja",
                              f"-Doptimization={optimization}",
                              f"-Db_ndebug={ndebug}",
-                             f"-Dstrip=true",
+                             f"-Dstrip={strip}",
                              f"-Db_vscrt={vscrt_from_configuration_and_runtime(host_machine.config, runtime)}",
                              *[opt.value for opt in pkg.options],
                          ],
