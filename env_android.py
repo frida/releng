@@ -2,8 +2,6 @@ from configparser import ConfigParser
 import os
 from pathlib import Path
 import shlex
-import subprocess
-import sys
 from typing import Callable, Optional
 
 from .machine_file import strv_to_meson
