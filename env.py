@@ -160,9 +160,15 @@ def generate_machine_config(machine: MachineSpec,
                                              ("glib-compile-resources", exe_suffix),
                                              ("glib-compile-schemas", exe_suffix),
                                              ("glib-genmarshal", ""),
-                                             ("glib-mkenums", "")}:
+                                             ("glib-mkenums", ""),
+                                             ("flex", exe_suffix),
+                                             ("bison", exe_suffix)}:
             tool_path = toolchain_bindir / (tool_name + filename_suffix)
-            if not tool_path.exists():
+            if tool_path.exists():
+                if tool_name == "bison":
+                    machine_env["BISON_PKGDATADIR"] = str(toolchain_prefix / "share" / "bison")
+                    machine_env["M4"] = str(toolchain_bindir / f"m4{exe_suffix}")
+            else:
                 tool_path = shutil.which(tool_name)
             if tool_path is not None:
                 binaries[tool_name] = strv_to_meson([str(tool_path)])
