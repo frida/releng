@@ -550,13 +550,15 @@ class Builder:
             assert manifest_path.exists()
 
     def _build_package_for_runtime(self, pkg: PackageSpec, runtime: str):
+        host_machine = self._host_machine
+
         sourcedir = self._get_sourcedir(pkg)
         builddir = self._get_builddir(pkg, runtime)
 
         prefix = self._get_prefix(runtime)
         libdir = prefix / "lib"
-        pcdir = prefix / self._host_machine.libdatadir / "pkgconfig"
-        if self._host_machine.config != "debug":
+        pcdir = prefix / host_machine.libdatadir / "pkgconfig"
+        if host_machine.config != "debug":
             optimization = "s"
             ndebug = "true"
         else:
@@ -582,7 +584,7 @@ class Builder:
                              f"-Doptimization={optimization}",
                              f"-Db_ndebug={ndebug}",
                              f"-Dstrip=true",
-                             f"-Db_vscrt={vscrt_from_configuration_and_runtime(self._host_machine.config, runtime)}",
+                             f"-Db_vscrt={vscrt_from_configuration_and_runtime(host_machine.config, runtime)}",
                              *[opt.value for opt in pkg.options],
                          ],
                          cwd=sourcedir,
