@@ -1,4 +1,3 @@
-import glob
 import json
 from operator import attrgetter
 import os
