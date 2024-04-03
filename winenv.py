@@ -10,8 +10,7 @@ if platform.system() == "Windows":
 
 RELENG_DIR = Path(__file__).resolve().parent
 ROOT_DIR = RELENG_DIR.parent
-DEFAULT_TOOLCHAIN_DIR = ROOT_DIR / "build" / "toolchain-windows"
-BOOTSTRAP_TOOLCHAIN_DIR = ROOT_DIR / "build" / "fts-toolchain-windows"
+TOOLCHAIN_DIR = ROOT_DIR / "deps" / "toolchain-windows-x86"
 
 cached_msvs_dir = None
 cached_msvc_dir = None
@@ -24,11 +23,7 @@ def detect_msvs_installation_dir():
         vswhere = Path(os.environ.get("ProgramFiles(x86)", os.environ["ProgramFiles"])) \
                 / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
         if not vswhere.exists():
-            if DEFAULT_TOOLCHAIN_DIR.exists():
-                toolchain_dir = DEFAULT_TOOLCHAIN_DIR
-            else:
-                toolchain_dir = BOOTSTRAP_TOOLCHAIN_DIR
-            vswhere = toolchain_dir / "bin" / "vswhere.exe"
+            vswhere = TOOLCHAIN_DIR / "bin" / "vswhere.exe"
         installations = json.loads(
             subprocess.run([
                                vswhere,
