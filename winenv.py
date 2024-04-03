@@ -137,10 +137,6 @@ def detect_msvs_library_path(machine):
     ]
 
 
-def msvs_platform_from_arch(arch: str) -> str:
-    return "x64" if arch == "x86_64" else "Win32"
-
-
 def msvc_platform_from_arch(arch: str) -> str:
     return "x64" if arch == "x86_64" else "x86"
 
