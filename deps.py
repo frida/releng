@@ -8,6 +8,7 @@ import graphlib
 import json
 import os
 from pathlib import Path, PurePath
+import shlex
 import shutil
 import subprocess
 import sys
@@ -459,6 +460,36 @@ class Builder:
         if toolchain_state == SourceState.MODIFIED:
             self._wipe_build_state()
 
+        envdir = self._get_builddir_container()
+        envdir.mkdir(parents=True, exist_ok=True)
+
+        menv = {**os.environ}
+
+        if self._bundle is Bundle.TOOLCHAIN:
+            extra_ldflags = []
+            if self._host_machine.is_apple:
+                symfile = envdir / "toolchain-executable.symbols"
+                symfile.write_text("# No exported symbols.\n", encoding="utf-8")
+                extra_ldflags += [f"-Wl,-exported_symbols_list,{symfile}"]
+            elif self._host_machine.os != "windows":
+                verfile = envdir / "toolchain-executable.version"
+                verfile.write_text("\n".join([
+                                                 "{",
+                                                 "  global:",
+                                                 "    # FreeBSD needs these two:",
+                                                 "    __progname;",
+                                                 "    environ;",
+                                                 "",
+                                                 "  local:",
+                                                 "    *;",
+                                                 "};",
+                                                 ""
+                                             ]),
+                                   encoding="utf-8")
+                extra_ldflags += [f"-Wl,--version-script,{verfile}"]
+            if extra_ldflags:
+                menv["LDFLAGS"] = shlex.join(extra_ldflags + shlex.split(menv.get("LDFLAGS", "")))
+
         (self._native_file, self._cross_file, machine_paths, machine_env) = \
                 env.generate_machine_files(build_machine=self._build_machine,
                                            build_sdk_prefix=None,
@@ -466,10 +497,11 @@ class Builder:
                                            host_sdk_prefix=None,
                                            toolchain_prefix=self._toolchain_prefix,
                                            default_library=self._default_library,
-                                           environ=os.environ,
+                                           environ=menv,
                                            call_selected_meson=self._call_meson,
-                                           outdir=self._get_builddir_container())
-        menv = {**os.environ, **machine_env}
+                                           outdir=envdir)
+
+        menv.update(machine_env)
         menv["PATH"] = os.pathsep.join([str(p) for p in machine_paths]) + os.pathsep + menv["PATH"]
         self._machine_env = menv
 
