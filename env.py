@@ -52,7 +52,7 @@ def generate_machine_files(build_machine: MachineSpec,
                            toolchain_prefix: Optional[Path],
                            default_library: DefaultLibrary,
                            call_selected_meson: Callable,
-                           build_dir: Path):
+                           outdir: Path):
     is_cross_build = host_machine != build_machine
 
     build_config, build_machine_path, build_machine_env = \
@@ -78,9 +78,9 @@ def generate_machine_files(build_machine: MachineSpec,
         host_machine_path = []
         host_machine_env = {}
 
-    build_dir.mkdir(parents=True, exist_ok=True)
-    build_file = write_machine_file(build_machine, build_config, build_dir)
-    host_file = write_machine_file(host_machine, host_config, build_dir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    build_file = write_machine_file(build_machine, build_config, outdir)
+    host_file = write_machine_file(host_machine, host_config, outdir)
 
     return (
         build_file,
