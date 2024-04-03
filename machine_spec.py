@@ -155,6 +155,10 @@ class MachineSpec:
             return 8
         return 4
 
+    @property
+    def libdatadir(self) -> str:
+        return "libdata" if self.os == "freebsd" else "lib"
+
     def __eq__(self, other):
         if isinstance(other, MachineSpec):
             return other.identifier == self.identifier
