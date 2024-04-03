@@ -213,6 +213,11 @@ class MachineSpec:
     def libdatadir(self) -> str:
         return "libdata" if self.os == "freebsd" else "lib"
 
+    @property
+    def toolchain_can_strip(self) -> bool:
+        is_msvc = self.os == "windows" and self.config != "mingw"
+        return not is_msvc
+
     def __eq__(self, other):
         if isinstance(other, MachineSpec):
             return other.identifier == self.identifier
