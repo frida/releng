@@ -52,6 +52,10 @@ APPLE_BINARIES = [
 ]
 
 
+class XCRunError(Exception):
+    pass
+
+
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
@@ -62,10 +66,20 @@ def init_machine_config(machine: MachineSpec,
     machine_path = []
     machine_env = {}
 
+    xcenv = {**environ}
+
+    def xcrun(*args):
+        try:
+            return subprocess.run(["xcrun"] + list(args),
+                                  env=xcenv,
+                                  capture_output=True,
+                                  encoding="utf-8",
+                                  check=True).stdout.strip()
+        except subprocess.CalledProcessError as e:
+            raise XCRunError("\n\t| ".join(e.stderr.strip().split("\n")))
+
     sdk_name = APPLE_SDKS[machine.os_dash_config]
-    sdk_path = subprocess.run(["xcrun", "--sdk", sdk_name, "--show-sdk-path"],
-                              capture_output=True,
-                              encoding="utf-8").stdout.strip()
+    sdk_path = xcrun("--sdk", sdk_name, "--show-sdk-path")
 
     use_static_libcxx = sdk_prefix is not None \
             and (sdk_prefix / "lib" / "c++" / "libc++.a").exists() \
@@ -78,9 +92,7 @@ def init_machine_config(machine: MachineSpec,
             binaries[identifier] = binaries[tool_name[1:]]
             continue
 
-        path = subprocess.run(["xcrun", "--sdk", sdk_name, "-f", tool_name],
-                              capture_output=True,
-                              encoding="utf-8").stdout.strip()
+        path = xcrun("--sdk", sdk_name, "-f", tool_name)
         if tool_name == "clang":
             clang_path = Path(path)
 
