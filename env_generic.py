@@ -11,95 +11,6 @@ from .machine_file import strv_to_meson
 from .machine_spec import MachineSpec
 
 
-ARCH_COMMON_FLAGS_UNIX = {
-    "x86": [
-        "-march=pentium4",
-    ],
-    "arm": [
-        "-march=armv5t",
-    ],
-    "armbe8": [
-        "-march=armv6",
-        "-mbe8",
-    ],
-    "armhf": [
-        "-march=armv7-a",
-    ],
-    "arm64": [
-        "-march=armv8-a",
-    ],
-    "mips": [
-        "-march=mips1",
-        "-mfp32",
-    ],
-    "mipsel": [
-        "-march=mips1",
-        "-mfp32",
-    ],
-    "mips64": [
-        "-march=mips64r2",
-        "-mabi=64",
-    ],
-    "mips64el": [
-        "-march=mips64r2",
-        "-mabi=64",
-    ],
-    "s390x": [
-        "-march=z10",
-        "-m64",
-    ],
-}
-
-ARCH_COMMON_FLAGS_QNX = {
-    "x86": [
-        "-march=i686",
-    ],
-    "arm": [
-        "-march=armv6",
-        "-mno-unaligned-access",
-    ],
-    "armeabi": [
-        "-march=armv7-a",
-        "-mno-unaligned-access",
-    ],
-}
-
-ARCH_C_LIKE_FLAGS_UNIX = {
-    "x86": [
-        "-mfpmath=sse",
-        "-mstackrealign",
-    ],
-}
-
-GCC_TOOL_IDS = [
-    "c",
-    "cpp",
-    "ar",
-    "nm",
-    "ranlib",
-    "strip",
-    "readelf",
-    "objcopy",
-    "objdump",
-]
-
-GCC_TOOL_NAMES = {
-    "c": "gcc",
-    "cpp": "g++",
-    "ar": "gcc-ar",
-    "nm": "gcc-nm",
-    "ranlib": "gcc-ranlib",
-}
-
-
-class CompilerNotFoundError(Exception):
-    pass
-
-
-class LinkerDetectionError(Exception):
-    pass
-
-
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
@@ -338,3 +249,92 @@ def detect_linker_flavor(cc: list[str]) -> str:
 
     excerpt = linker_version.split("\n")[0].rstrip()
     raise LinkerDetectionError(f"unknown linker: '{excerpt}'")
+
+
+class CompilerNotFoundError(Exception):
+    pass
+
+
+class LinkerDetectionError(Exception):
+    pass
+
+
+ARCH_COMMON_FLAGS_UNIX = {
+    "x86": [
+        "-march=pentium4",
+    ],
+    "arm": [
+        "-march=armv5t",
+    ],
+    "armbe8": [
+        "-march=armv6",
+        "-mbe8",
+    ],
+    "armhf": [
+        "-march=armv7-a",
+    ],
+    "arm64": [
+        "-march=armv8-a",
+    ],
+    "mips": [
+        "-march=mips1",
+        "-mfp32",
+    ],
+    "mipsel": [
+        "-march=mips1",
+        "-mfp32",
+    ],
+    "mips64": [
+        "-march=mips64r2",
+        "-mabi=64",
+    ],
+    "mips64el": [
+        "-march=mips64r2",
+        "-mabi=64",
+    ],
+    "s390x": [
+        "-march=z10",
+        "-m64",
+    ],
+}
+
+ARCH_COMMON_FLAGS_QNX = {
+    "x86": [
+        "-march=i686",
+    ],
+    "arm": [
+        "-march=armv6",
+        "-mno-unaligned-access",
+    ],
+    "armeabi": [
+        "-march=armv7-a",
+        "-mno-unaligned-access",
+    ],
+}
+
+ARCH_C_LIKE_FLAGS_UNIX = {
+    "x86": [
+        "-mfpmath=sse",
+        "-mstackrealign",
+    ],
+}
+
+GCC_TOOL_IDS = [
+    "c",
+    "cpp",
+    "ar",
+    "nm",
+    "ranlib",
+    "strip",
+    "readelf",
+    "objcopy",
+    "objdump",
+]
+
+GCC_TOOL_NAMES = {
+    "c": "gcc",
+    "cpp": "g++",
+    "ar": "gcc-ar",
+    "nm": "gcc-nm",
+    "ranlib": "gcc-ranlib",
+}

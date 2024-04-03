@@ -8,58 +8,6 @@ from .machine_file import strv_to_meson
 from .machine_spec import MachineSpec
 
 
-APPLE_SDKS = {
-    "macos":             "macosx",
-    "ios":               "iphoneos",
-    "ios-simulator":     "iphonesimulator",
-    "watchos":           "watchos",
-    "watchos-simulator": "watchsimulator",
-    "tvos":              "appletvos",
-    "tvos-simulator":    "appletvsimulator",
-}
-
-APPLE_CLANG_ARCHS = {
-    "x86":        "i386",
-    "arm":        "armv7",
-    "arm64eoabi": "arm64e",
-}
-
-APPLE_MINIMUM_OS_VERSIONS = {
-    "macos":        "10.9",
-    "macos-arm64":  "11.0",
-    "macos-arm64e": "11.0",
-    "ios":          "8.0",
-    "watchos":      "9.0",
-    "tvos":         "13.0",
-}
-
-APPLE_BINARIES = [
-    ("c",                 "clang"),
-    ("cpp",               "clang++"),
-    ("objc",              "#c"),
-    ("objcpp",            "#cpp"),
-
-    ("ar",                "ar"),
-    ("nm",                "llvm-nm"),
-    ("ranlib",            "ranlib"),
-    ("strip",             "strip", ["-Sx"]),
-    ("libtool",           "libtool"),
-
-    ("install_name_tool", "install_name_tool"),
-    ("otool",             "otool"),
-    ("codesign",          "codesign"),
-    ("lipo",              "lipo"),
-]
-
-
-class XCRunError(Exception):
-    pass
-
-
-class Xcode11NotFoundError(Exception):
-    pass
-
-
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
@@ -172,3 +120,55 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
+
+
+class XCRunError(Exception):
+    pass
+
+
+class Xcode11NotFoundError(Exception):
+    pass
+
+
+APPLE_SDKS = {
+    "macos":             "macosx",
+    "ios":               "iphoneos",
+    "ios-simulator":     "iphonesimulator",
+    "watchos":           "watchos",
+    "watchos-simulator": "watchsimulator",
+    "tvos":              "appletvos",
+    "tvos-simulator":    "appletvsimulator",
+}
+
+APPLE_CLANG_ARCHS = {
+    "x86":        "i386",
+    "arm":        "armv7",
+    "arm64eoabi": "arm64e",
+}
+
+APPLE_MINIMUM_OS_VERSIONS = {
+    "macos":        "10.9",
+    "macos-arm64":  "11.0",
+    "macos-arm64e": "11.0",
+    "ios":          "8.0",
+    "watchos":      "9.0",
+    "tvos":         "13.0",
+}
+
+APPLE_BINARIES = [
+    ("c",                 "clang"),
+    ("cpp",               "clang++"),
+    ("objc",              "#c"),
+    ("objcpp",            "#cpp"),
+
+    ("ar",                "ar"),
+    ("nm",                "llvm-nm"),
+    ("ranlib",            "ranlib"),
+    ("strip",             "strip", ["-Sx"]),
+    ("libtool",           "libtool"),
+
+    ("install_name_tool", "install_name_tool"),
+    ("otool",             "otool"),
+    ("codesign",          "codesign"),
+    ("lipo",              "lipo"),
+]

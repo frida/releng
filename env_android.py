@@ -7,53 +7,6 @@ from .machine_file import strv_to_meson
 from .machine_spec import MachineSpec
 
 
-NDK_REQUIRED = 25
-
-NDK_BINARIES = [
-    ("c",       "clang"),
-    ("cpp",     "clang++"),
-    ("ar",      "llvm-ar"),
-    ("nm",      "llvm-nm"),
-    ("ranlib",  "llvm-ranlib"),
-    ("strip",   "llvm-strip", ["--strip-all"]),
-    ("readelf", "llvm-readelf"),
-    ("objcopy", "llvm-objcopy"),
-    ("objdump", "llvm-objdump"),
-]
-
-ARCH_COMMON_FLAGS = {
-    "x86": [
-        "-march=pentium4",
-    ],
-    "arm": [
-        "-march=armv7-a",
-        "-mfloat-abi=softfp",
-        "-mfpu=vfpv3-d16",
-    ]
-}
-
-ARCH_C_LIKE_FLAGS = {
-    "x86": [
-        "-mfpmath=sse",
-        "-mstackrealign",
-    ]
-}
-
-ARCH_LINKER_FLAGS = {
-    "arm": [
-        "-Wl,--fix-cortex-a8",
-    ]
-}
-
-
-class NdkNotFoundError(Exception):
-    pass
-
-
-class NdkVersionError(Exception):
-    pass
-
-
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
@@ -149,3 +102,50 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = "true"
 
     return (machine_path, machine_env)
+
+
+class NdkNotFoundError(Exception):
+    pass
+
+
+class NdkVersionError(Exception):
+    pass
+
+
+NDK_REQUIRED = 25
+
+NDK_BINARIES = [
+    ("c",       "clang"),
+    ("cpp",     "clang++"),
+    ("ar",      "llvm-ar"),
+    ("nm",      "llvm-nm"),
+    ("ranlib",  "llvm-ranlib"),
+    ("strip",   "llvm-strip", ["--strip-all"]),
+    ("readelf", "llvm-readelf"),
+    ("objcopy", "llvm-objcopy"),
+    ("objdump", "llvm-objdump"),
+]
+
+ARCH_COMMON_FLAGS = {
+    "x86": [
+        "-march=pentium4",
+    ],
+    "arm": [
+        "-march=armv7-a",
+        "-mfloat-abi=softfp",
+        "-mfpu=vfpv3-d16",
+    ]
+}
+
+ARCH_C_LIKE_FLAGS = {
+    "x86": [
+        "-mfpmath=sse",
+        "-mstackrealign",
+    ]
+}
+
+ARCH_LINKER_FLAGS = {
+    "arm": [
+        "-Wl,--fix-cortex-a8",
+    ]
+}
