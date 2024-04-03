@@ -1,9 +1,9 @@
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Dict, List, Sequence, Union
+from typing import Sequence, Union
 
 
-def load(mfile: Path) -> Dict[str, Union[str, List[str]]]:
+def load(mfile: Path) -> dict[str, Union[str, list[str]]]:
     config = ConfigParser()
     config.read(mfile)
 
