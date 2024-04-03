@@ -56,6 +56,10 @@ class XCRunError(Exception):
     pass
 
 
+class Xcode11NotFoundError(Exception):
+    pass
+
+
 def init_machine_config(machine: MachineSpec,
                         sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
@@ -67,6 +71,11 @@ def init_machine_config(machine: MachineSpec,
     machine_env = {}
 
     xcenv = {**environ}
+    if machine.arch == "arm64eoabi":
+        try:
+            xcenv["DEVELOPER_DIR"] = (Path(xcenv["XCODE11"]) / "Contents" / "Developer").as_posix()
+        except KeyError:
+            raise Xcode11NotFoundError("for arm64eoabi support, XCODE11 must be set to the location of your Xcode 11 app bundle")
 
     def xcrun(*args):
         try:
