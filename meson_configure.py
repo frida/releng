@@ -135,6 +135,7 @@ def configure(sourcedir: Path,
         f"-Dprefix={prefix}",
         f"-Ddefault_library={default_library}",
         "-Doptimization=s",
+        "-Db_ndebug=true",
         "-Db_vscrt=mt",
     ]
     extra_paths = []
