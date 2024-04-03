@@ -7,7 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
-from typing import Callable, Literal, Optional, Sequence, Tuple
+from typing import Callable, Literal, Optional
 
 from . import env_android, env_apple, env_generic, machine_file
 from .machine_file import bool_to_meson, str_to_meson, strv_to_meson
@@ -201,7 +201,7 @@ def needs_exe_wrapper(machine: MachineSpec,
 
 
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
-                                   build_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
+                                   build_machine: MachineSpec) -> Optional[tuple[Path, Path]]:
     datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
     if datadir is None:
         return None
