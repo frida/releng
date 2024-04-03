@@ -386,7 +386,11 @@ def collect_meson_options(options: argparse.Namespace) -> List[str]:
     result = []
 
     if not options.enable_symbols:
-        result += ["-Dstrip=true"]
+        machine = options.host
+        if machine is None:
+            machine = MachineSpec.make_from_local_system()
+        if machine.toolchain_can_strip:
+            result += ["-Dstrip=true"]
 
     for raw_name, raw_val in vars(options).items():
         if raw_val is None:
