@@ -5,7 +5,7 @@ bootstrap_version = "20240319"
 [ninja]
 scope = "toolchain"
 name = "Ninja"
-version = "2b9a6336dcc0aa96846570caada249219e56cb7c"
+version = "516800b093d1a2e5589ee1cdd7393dffdf9c702e"
 url = "https://github.com/frida/ninja.git"
 
 [termux-elf-cleaner]
