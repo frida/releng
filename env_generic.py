@@ -30,7 +30,7 @@ def init_machine_config(machine: MachineSpec,
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["b_lundef"] = str(not allow_undefined_symbols).lower()
 
-    binaries = OrderedDict()
+    binaries = config["binaries"]
     cc = None
     common_flags = []
     c_like_flags = []
@@ -89,7 +89,6 @@ def init_machine_config(machine: MachineSpec,
                         copy[key] = val
                     config[section] = copy
 
-                binaries = config["binaries"]
                 raw_cc = binaries.get("c", None)
                 if raw_cc is not None:
                     cc = eval(raw_cc.replace("\\", "\\\\"), None, {"common_flags": []})
@@ -196,8 +195,6 @@ def init_machine_config(machine: MachineSpec,
             linker_flags += ["-Wl,--gc-sections"]
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
-
-    config["binaries"].update(binaries)
 
     constants = config["constants"]
     constants["common_flags"] = strv_to_meson(common_flags)

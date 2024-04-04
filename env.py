@@ -122,9 +122,7 @@ def generate_machine_config(machine: MachineSpec,
     config["constants"] = OrderedDict()
     config["binaries"] = OrderedDict()
     config["built-in options"] = OrderedDict()
-    config["properties"] = OrderedDict([
-        ("needs_exe_wrapper", bool_to_meson(needs_exe_wrapper(machine, build_machine, environ))),
-    ])
+    config["properties"] = OrderedDict()
     config["host_machine"] = OrderedDict([
         ("system", str_to_meson(machine.system)),
         ("subsystem", str_to_meson(machine.subsystem)),
@@ -133,6 +131,9 @@ def generate_machine_config(machine: MachineSpec,
         ("cpu", str_to_meson(machine.cpu)),
         ("endian", str_to_meson(machine.endian)),
     ])
+
+    binaries = config["binaries"]
+    properties = config["properties"]
 
     if machine.is_apple:
         impl = env_apple
@@ -150,8 +151,6 @@ def generate_machine_config(machine: MachineSpec,
                                                          config)
 
     if toolchain_prefix is not None:
-        binaries = config["binaries"]
-
         toolchain_bindir = toolchain_prefix / "bin"
         exe_suffix = build_machine.executable_suffix
 
@@ -207,6 +206,13 @@ def generate_machine_config(machine: MachineSpec,
         pkg_config_path = [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
         config["built-in options"]["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
+    needs_wrapper = needs_exe_wrapper(machine, build_machine, environ)
+    properties["needs_exe_wrapper"] = bool_to_meson(needs_wrapper)
+    if needs_wrapper:
+        wrapper = find_exe_wrapper(machine, environ)
+        if wrapper is not None:
+            binaries["exe_wrapper"] = strv_to_meson(wrapper)
+
     sink = io.StringIO()
     config.write(sink)
 
@@ -219,6 +225,20 @@ def needs_exe_wrapper(machine: MachineSpec,
     if environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
         return False
     return machine != build_machine
+
+
+def find_exe_wrapper(machine: MachineSpec,
+                     environ: dict[str, str]) -> Optional[list[str]]:
+    qemu_sysroot = environ.get("FRIDA_QEMU_SYSROOT")
+    if qemu_sysroot is None:
+        return None
+
+    qemu_flavor = "qemu-" + QEMU_ARCHS.get(machine.arch, machine.arch)
+    qemu_binary = shutil.which(qemu_flavor)
+    if qemu_binary is None:
+        raise QEMUNotFoundError(f"unable to find {qemu_flavor}, needed due to FRIDA_QEMU_SYSROOT being set")
+
+    return [qemu_binary, "-L", qemu_sysroot]
 
 
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
@@ -238,6 +258,10 @@ def build_envvar_to_host(name: str) -> str:
     if name.endswith("_FOR_BUILD"):
         return name[:-10]
     return name
+
+
+class QEMUNotFoundError(Exception):
+    pass
 
 
 # Based on mesonbuild/envconfig.py and mesonbuild/compilers/compilers.py
@@ -305,4 +329,11 @@ TOOLCHAIN_ENVVARS = {
     "CYTHONFLAGS",
     "CSFLAGS",
     "LDFLAGS",
+}
+
+QEMU_ARCHS = {
+    "armeabi": "arm",
+    "armhf": "arm",
+    "armbe8": "armeb",
+    "arm64": "aarch64",
 }
