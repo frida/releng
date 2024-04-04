@@ -46,7 +46,9 @@ def make(sourcedir: Path, builddir: Path, targets: List[str]):
     env_config = json.loads((builddir / "frida-env-config.json").read_text(encoding="utf-8"))
 
     meson_env = {**os.environ, **env_config["env"]}
-    meson_env["PATH"] = os.pathsep.join(env_config["paths"]) + os.pathsep + meson_env["PATH"]
+    paths = env_config["paths"]
+    if paths:
+        meson_env["PATH"] = os.pathsep.join(paths) + os.pathsep + meson_env["PATH"]
 
     compile_options = []
     if os.environ.get("V", None) == "1":
