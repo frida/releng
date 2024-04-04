@@ -120,7 +120,8 @@ def main():
                          type=parse_set_option_value)
     command.add_argument("--exclude", help="exclude packages A, B, and C", metavar="A,B,C",
                          type=parse_set_option_value, default=set())
-    command.set_defaults(func=lambda args: build(args.bundle, args.host, args.only, args.exclude))
+    command.add_argument("-v", "--verbose", help="be verbose", action="store_true")
+    command.set_defaults(func=lambda args: build(args.bundle, args.host, args.only, args.exclude, args.verbose))
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", **bundle_opt_kwargs)
@@ -334,8 +335,9 @@ def roll(bundle: Bundle, machine: MachineSpec, activate: bool, post: Optional[Pa
 def build(bundle: Bundle,
           machine: MachineSpec,
           only_packages: Optional[set[str]] = None,
-          excluded_packages: set[str] = set()) -> Path:
-    builder = Builder(bundle, machine)
+          excluded_packages: set[str] = set(),
+          verbose: bool = False) -> Path:
+    builder = Builder(bundle, machine, verbose)
     try:
         return builder.build(only_packages, excluded_packages)
     except subprocess.CalledProcessError as e:
@@ -348,10 +350,14 @@ def build(bundle: Bundle,
 
 
 class Builder:
-    def __init__(self, bundle: Bundle, host_machine: MachineSpec):
+    def __init__(self,
+                 bundle: Bundle,
+                 host_machine: MachineSpec,
+                 verbose: bool):
         self._bundle = bundle
         self._build_machine = MachineSpec.make_from_local_system()
         self._host_machine = host_machine
+        self._verbose = verbose
         self._default_library = "static"
         runtimes = ["static"]
         if host_machine.os == "windows" and bundle is Bundle.SDK:
@@ -591,6 +597,14 @@ class Builder:
         if self._cross_file is not None:
             machine_file_opts += [f"--cross-file={self._cross_file}"]
 
+        meson_kwargs = {
+            "env": self._machine_env,
+            "check": True,
+        }
+        if not self._verbose:
+            meson_kwargs["capture_output"] = True
+            meson_kwargs["encoding"] = "utf-8"
+
         self._call_meson([
                              "setup",
                              builddir,
@@ -607,17 +621,11 @@ class Builder:
                              *[opt.value for opt in pkg.options],
                          ],
                          cwd=sourcedir,
-                         env=self._machine_env,
-                         capture_output=True,
-                         encoding="utf-8",
-                         check=True)
+                         **meson_kwargs)
 
         self._call_meson(["install"],
                          cwd=builddir,
-                         env=self._machine_env,
-                         capture_output=True,
-                         encoding="utf-8",
-                         check=True)
+                         **meson_kwargs)
 
         manifest_lines = []
         install_locations = json.loads(self._call_meson(["introspect", "--installed"],
@@ -659,6 +667,17 @@ class Builder:
             print(f"# {scope} :: {status}", flush=True)
 
     def _call_meson(self, argv, *args, **kwargs):
+        if self._verbose and argv[0] in {"setup", "install"}:
+            vanilla_env = os.environ
+            meson_env = kwargs["env"]
+            changed_env = {k: v for k, v in meson_env.items() if k not in vanilla_env or v != vanilla_env[k]}
+
+            indent = "  "
+            env_summary = f" \\\n{indent}".join([f"{k}={shlex.quote(v)}" for k, v in changed_env.items()])
+            argv_summary = f" \\\n{3 * indent}".join([str(arg) for arg in argv])
+
+            print(f"> {env_summary} \\\n{indent}meson {argv_summary}")
+
         return env.call_meson(argv, use_submodule=True, *args, **kwargs)
 
     def _package(self):
