@@ -213,7 +213,8 @@ def configure(sourcedir: Path,
     raw_extra_paths = [str(p) for p in extra_paths]
 
     meson_env = {**os.environ, **machine_env}
-    meson_env["PATH"] = os.pathsep.join(raw_extra_paths) + os.pathsep + meson_env["PATH"]
+    if raw_extra_paths:
+        meson_env["PATH"] = os.pathsep.join(raw_extra_paths) + os.pathsep + meson_env["PATH"]
 
     process = call_selected_meson(["setup"] + meson_options + extra_meson_options + [builddir],
                                   cwd=sourcedir,
