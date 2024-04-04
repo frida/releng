@@ -82,6 +82,13 @@ def init_machine_config(machine: MachineSpec,
                     copy = config[section] if section in config else OrderedDict()
                     for key, val in mcfg.items(section):
                         if section == "binaries":
+                            argv = eval(val.replace("\\", "\\\\"))
+                            if not Path(argv[0]).is_absolute():
+                                path = shutil.which(argv[0])
+                                if path is None:
+                                    raise BinaryNotFoundError(f"unable to locate {argv[0]}")
+                                argv[0] = path
+                            val = strv_to_meson(argv)
                             if key in {"c", "cpp"}:
                                 val += " + common_flags"
                         if key in copy and section == "built-in options" and key.endswith("_args"):
@@ -249,6 +256,10 @@ def detect_linker_flavor(cc: list[str]) -> str:
 
 
 class CompilerNotFoundError(Exception):
+    pass
+
+
+class BinaryNotFoundError(Exception):
     pass
 
 
