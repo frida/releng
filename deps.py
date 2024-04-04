@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 import argparse
 import base64
 import dataclasses
@@ -30,60 +31,6 @@ from tomlkit.toml_file import TOMLFile
 
 from releng import env, winenv
 from releng.machine_spec import MachineSpec
-
-
-BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
-
-DEPS_TOML_PATH = RELENG_DIR / "deps.toml"
-
-
-class Bundle(Enum):
-    TOOLCHAIN = 1,
-    SDK = 2,
-
-
-class SourceState(Enum):
-    PRISTINE = 1,
-    MODIFIED = 2,
-
-
-class BundleNotFoundError(Exception):
-    pass
-
-
-@dataclass
-class OptionSpec:
-    value: str
-    when: Optional[str] = None
-
-
-@dataclass
-class DependencySpec:
-    identifier: str
-    when: Optional[str] = None
-
-
-@dataclass
-class PackageSpec:
-    identifier: str
-    name: str
-    version: str
-    url: str
-    options: list[OptionSpec] = field(default_factory=list)
-    dependencies: list[DependencySpec] = field(default_factory=list)
-    scope: Optional[str] = None
-    when: Optional[str] = None
-
-
-@dataclass
-class DependencyParameters:
-    deps_version: str
-    bootstrap_version: str
-    packages: dict[str, PackageSpec]
-
-
-class CommandError(Exception):
-    pass
 
 
 def main():
@@ -993,6 +940,60 @@ def format_duration(duration_in_seconds: float) -> str:
     hours, remainder = divmod(duration_in_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
+
+
+class CommandError(Exception):
+    pass
+
+
+DEPS_TOML_PATH = RELENG_DIR / "deps.toml"
+
+BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
+
+
+class Bundle(Enum):
+    TOOLCHAIN = 1,
+    SDK = 2,
+
+
+class BundleNotFoundError(Exception):
+    pass
+
+
+class SourceState(Enum):
+    PRISTINE = 1,
+    MODIFIED = 2,
+
+
+@dataclass
+class DependencyParameters:
+    deps_version: str
+    bootstrap_version: str
+    packages: dict[str, PackageSpec]
+
+
+@dataclass
+class PackageSpec:
+    identifier: str
+    name: str
+    version: str
+    url: str
+    options: list[OptionSpec] = field(default_factory=list)
+    dependencies: list[DependencySpec] = field(default_factory=list)
+    scope: Optional[str] = None
+    when: Optional[str] = None
+
+
+@dataclass
+class OptionSpec:
+    value: str
+    when: Optional[str] = None
+
+
+@dataclass
+class DependencySpec:
+    identifier: str
+    when: Optional[str] = None
 
 
 if __name__ == "__main__":
