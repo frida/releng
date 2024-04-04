@@ -525,7 +525,8 @@ class Builder:
                                            outdir=envdir)
 
         menv.update(machine_env)
-        menv["PATH"] = os.pathsep.join([str(p) for p in machine_paths]) + os.pathsep + menv["PATH"]
+        if machine_paths:
+            menv["PATH"] = os.pathsep.join([str(p) for p in machine_paths]) + os.pathsep + menv["PATH"]
         self._machine_env = menv
 
     def _grab_and_prepare(self, pkg: PackageSpec) -> SourceState:
