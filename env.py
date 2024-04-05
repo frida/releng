@@ -53,10 +53,6 @@ def query_machine_file_path(machine: MachineSpec, flavor: str, build_dir: Path) 
     return build_dir / f"frida{flavor}-{machine.identifier}.txt"
 
 
-def enumerate_build_dirs(build_dir: Path):
-    return build_dir.glob("tmp-*/*")
-
-
 def detect_default_prefix() -> Path:
     if platform.system() == "Windows":
         return Path(os.environ["ProgramFiles"]) / "Frida"
