@@ -6,6 +6,7 @@ import dataclasses
 from dataclasses import dataclass, field
 from enum import Enum
 import graphlib
+import itertools
 import json
 import os
 from pathlib import Path, PurePath
@@ -347,11 +348,17 @@ class Builder:
                     for pkg in selected_packages.values()})
             packages = [selected_packages[identifier] for identifier in ts.static_order()]
 
+            all_deps = itertools.chain.from_iterable([pkg.dependencies for pkg in packages])
+            deps_for_build_machine = {dep.identifier for dep in all_deps if dep.for_machine == "build"}
+
             self._prepare(packages)
             prepare_ended_at = time.time()
 
             for pkg in packages:
-                self._build_package(pkg)
+                machines = [self._host_machine]
+                if pkg.identifier in deps_for_build_machine:
+                    machines += [self._build_machine]
+                self._build_package(pkg, machines)
             build_ended_at = time.time()
 
             artifact_file = self._package()
@@ -509,41 +516,46 @@ class Builder:
                 self._print_status(path.relative_to(self._workdir).as_posix(), "Wiping")
                 shutil.rmtree(path)
 
-    def _build_package(self, pkg: PackageSpec):
-        for runtime in self._runtimes:
-            manifest_path = self._get_manifest_path(pkg, runtime)
-            if manifest_path.exists():
-                continue
+    def _build_package(self, pkg: PackageSpec, machines: Sequence[MachineSpec]):
+        for machine in machines:
+            for runtime in self._runtimes:
+                manifest_path = self._get_manifest_path(pkg, machine, runtime)
+                if manifest_path.exists():
+                    continue
 
-            self._print_status(pkg.name, f"Building for the {runtime} CRT" if len(self._runtimes) > 1 else "Building")
-            self._build_package_for_runtime(pkg, runtime)
+                message = f"Building for {machine.identifier}"
+                if len(self._runtimes) > 1:
+                    message += f" [{runtime} CRT]"
+                self._print_status(pkg.name, message)
 
-            assert manifest_path.exists()
+                self._build_package_for_machine(pkg, machine, runtime)
 
-    def _build_package_for_runtime(self, pkg: PackageSpec, runtime: str):
-        host_machine = self._host_machine
+                assert manifest_path.exists()
 
+    def _build_package_for_machine(self, pkg: PackageSpec, machine: MachineSpec, runtime: str):
         sourcedir = self._get_sourcedir(pkg)
-        builddir = self._get_builddir(pkg, runtime)
+        builddir = self._get_builddir(pkg, machine, runtime)
 
-        prefix = self._get_prefix(runtime)
+        prefix = self._get_prefix(machine, runtime)
         libdir = prefix / "lib"
-        pcdir = prefix / host_machine.libdatadir / "pkgconfig"
-        if host_machine.config != "debug":
+        if machine.config != "debug":
             optimization = "s"
             ndebug = "true"
         else:
             optimization = "0"
             ndebug = "false"
 
-        strip = "true" if host_machine.toolchain_can_strip else "false"
+        strip = "true" if machine.toolchain_can_strip else "false"
 
         if builddir.exists():
             shutil.rmtree(builddir)
 
         machine_file_opts = [f"--native-file={self._native_file}"]
-        if self._cross_file is not None:
+        pc_opts = [f"-Dpkg_config_path={prefix / machine.libdatadir / 'pkgconfig'}"]
+        if self._cross_file is not None and machine == self._host_machine:
             machine_file_opts += [f"--cross-file={self._cross_file}"]
+            pc_path_for_build = self._get_prefix(self._build_machine, runtime) / self._build_machine.libdatadir / "pkgconfig"
+            pc_opts += [f"-Dbuild.pkg_config_path={pc_path_for_build}"]
 
         meson_kwargs = {
             "env": self._machine_env,
@@ -559,13 +571,13 @@ class Builder:
                              *machine_file_opts,
                              f"-Dprefix={prefix}",
                              f"-Dlibdir={libdir}",
-                             f"-Dpkg_config_path={pcdir}",
+                             *pc_opts,
                              f"-Ddefault_library={self._default_library}",
                              f"-Dbackend=ninja",
                              f"-Doptimization={optimization}",
                              f"-Db_ndebug={ndebug}",
                              f"-Dstrip={strip}",
-                             f"-Db_vscrt={vscrt_from_configuration_and_runtime(host_machine.config, runtime)}",
+                             f"-Db_vscrt={vscrt_from_configuration_and_runtime(machine.config, runtime)}",
                              *[opt.value for opt in pkg.options],
                          ],
                          cwd=sourcedir,
@@ -584,7 +596,7 @@ class Builder:
         for installed_path in install_locations.values():
             manifest_lines.append(Path(installed_path).relative_to(prefix).as_posix())
         manifest_lines.sort()
-        manifest_path = self._get_manifest_path(pkg, runtime)
+        manifest_path = self._get_manifest_path(pkg, machine, runtime)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
@@ -664,7 +676,7 @@ class Builder:
             copy_files(self._toolchain_prefix, mixin_files, location)
 
         files = []
-        prefix = self._get_prefix("static")
+        prefix = self._get_prefix(self._host_machine, "static")
         for dirpath, dirnames, filenames in os.walk(prefix):
             relpath = PurePath(dirpath).relative_to(prefix)
             all_files = [relpath / f for f in filenames]
@@ -681,7 +693,7 @@ class Builder:
         files = []
         outdir = self._get_outdir()
         for runtime in self._runtimes:
-            prefix = self._get_prefix("static")
+            prefix = self._get_prefix(self._host_machine, "static")
             for dirpath, dirnames, filenames in os.walk(prefix):
                 relpath = PurePath(dirpath).relative_to(outdir)
                 all_files = [relpath / f for f in filenames]
@@ -691,7 +703,7 @@ class Builder:
         copy_files(outdir, files, location, self._transform_sdk_dest)
 
     def _adjust_files_containing_hardcoded_paths(self, bundledir: Path):
-        prefixes = [str(self._get_prefix(runtime)) for runtime in self._runtimes]
+        prefixes = [str(self._get_prefix(self._host_machine, runtime)) for runtime in self._runtimes]
         for raw_dirpath, dirnames, filenames in os.walk(bundledir):
             dirpath = Path(raw_dirpath)
             for filename in filenames:
@@ -777,23 +789,23 @@ class Builder:
     def _get_sourcedir(self, pkg: PackageSpec) -> Path:
         return self._workdir / pkg.identifier
 
-    def _get_builddir(self, pkg: PackageSpec, runtime: str) -> Path:
-        return self._get_builddir_container() / self._compute_output_id(runtime) / pkg.identifier
+    def _get_builddir(self, pkg: PackageSpec, machine: MachineSpec, runtime: str) -> Path:
+        return self._get_builddir_container() / self._compute_output_id(machine, runtime) / pkg.identifier
 
     def _get_builddir_container(self) -> Path:
         return self._workdir / f"_{self._bundle.name.lower()}.tmp"
 
-    def _get_prefix(self, runtime: str) -> Path:
-        return self._get_outdir() / self._compute_output_id(runtime)
+    def _get_prefix(self, machine: MachineSpec, runtime: str) -> Path:
+        return self._get_outdir() / self._compute_output_id(machine, runtime)
 
-    def _compute_output_id(self, runtime: str) -> str:
-        parts = [self._host_machine.identifier]
-        if self._host_machine.os == "windows":
+    def _compute_output_id(self, machine: MachineSpec, runtime: str) -> str:
+        parts = [machine.identifier]
+        if machine.os == "windows":
             parts += [runtime]
         return "-".join(parts)
 
-    def _get_manifest_path(self, pkg: PackageSpec, runtime: str) -> Path:
-        return self._get_prefix(runtime) / "manifest" / f"{pkg.identifier}.pkg"
+    def _get_manifest_path(self, pkg: PackageSpec, machine: MachineSpec, runtime: str) -> Path:
+        return self._get_prefix(machine, runtime) / "manifest" / f"{pkg.identifier}.pkg"
 
 
 def vscrt_from_configuration_and_runtime(config: str, runtime: str) -> str:
@@ -917,7 +929,7 @@ def parse_option(v: Union[str, dict]) -> OptionSpec:
 def parse_dependency(v: Union[str, dict]) -> OptionSpec:
     if isinstance(v, str):
         return DependencySpec(v)
-    return DependencySpec(v["id"], v.get("when"))
+    return DependencySpec(v["id"], v.get("for_machine"), v.get("when"))
 
 
 def query_git_head(repo_path: str) -> str:
@@ -993,6 +1005,7 @@ class OptionSpec:
 @dataclass
 class DependencySpec:
     identifier: str
+    for_machine: str = "host"
     when: Optional[str] = None
 
 
