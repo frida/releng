@@ -305,7 +305,7 @@ class Builder:
                  host_machine: MachineSpec,
                  verbose: bool):
         self._bundle = bundle
-        self._build_machine = MachineSpec.make_from_local_system()
+        self._build_machine = MachineSpec.make_from_local_system().maybe_adapt_to_host(host_machine)
         self._host_machine = host_machine
         self._verbose = verbose
         self._default_library = "static"
