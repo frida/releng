@@ -153,10 +153,6 @@ class MachineSpec:
         return ".exe" if self.os == "windows" else ""
 
     @property
-    def msvs_platform(self) -> str:
-        return "x64" if self.arch == "x86_64" else "Win32"
-
-    @property
     def msvc_platform(self) -> str:
         return "x64" if self.arch == "x86_64" else "x86"
 
