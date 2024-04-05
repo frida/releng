@@ -215,12 +215,37 @@ def generate_machine_config(machine: MachineSpec,
     return MachineConfig(machine_file, machine_path, machine_env)
 
 
-def needs_exe_wrapper(machine: MachineSpec,
-                      build_machine: MachineSpec,
+def needs_exe_wrapper(build_machine: MachineSpec,
+                      host_machine: MachineSpec,
                       environ: dict[str, str]) -> bool:
-    if environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes":
-        return False
-    return machine != build_machine
+    return not can_run_host_binaries(build_machine, host_machine, environ)
+
+
+def can_run_host_binaries(build_machine: MachineSpec,
+                          host_machine: MachineSpec,
+                          environ: dict[str, str]) -> bool:
+    if host_machine == build_machine:
+        return True
+
+    build_os = build_machine.os
+    build_arch = build_machine.arch
+
+    host_os = host_machine.os
+    host_arch = host_machine.arch
+
+    if host_os == build_os:
+        if build_os == "windows":
+            return True
+
+        if build_os == "macos":
+            if build_arch == "arm64" and host_arch == "x86_64":
+                return True
+
+        if build_os == "linux" and host_machine.config == build_machine.config:
+            if build_arch == "x86_64" and host_arch == "x86":
+                return True
+
+    return environ.get("FRIDA_CAN_RUN_HOST_BINARIES", "no") == "yes"
 
 
 def find_exe_wrapper(machine: MachineSpec,
