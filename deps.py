@@ -319,9 +319,10 @@ class Builder:
         self._workdir = self._cachedir / "src"
 
         self._toolchain_prefix: Optional[Path] = None
-        self._native_file: Optional[Path] = None
-        self._cross_file: Optional[Path] = None
-        self._machine_env: dict[str, str] = {}
+        self._build_config: Optional[env.MachineConfig] = None
+        self._host_config: Optional[env.MachineConfig] = None
+        self._build_env: dict[str, str] = {}
+        self._host_env: dict[str, str] = {}
 
         self._ansi_supported = os.environ.get("TERM") != "dumb" \
                     and (self._build_machine.os != "windows" or "WT_SESSION" in os.environ)
@@ -478,21 +479,18 @@ class Builder:
             if extra_ldflags:
                 menv["LDFLAGS"] = shlex.join(extra_ldflags + shlex.split(menv.get("LDFLAGS", "")))
 
-        (self._native_file, self._cross_file, machine_paths, machine_env) = \
-                env.generate_machine_files(build_machine=self._build_machine,
-                                           build_sdk_prefix=None,
-                                           host_machine=self._host_machine,
-                                           host_sdk_prefix=None,
-                                           toolchain_prefix=self._toolchain_prefix,
-                                           default_library=self._default_library,
-                                           environ=menv,
-                                           call_selected_meson=self._call_meson,
-                                           outdir=envdir)
-
-        menv.update(machine_env)
-        if machine_paths:
-            menv["PATH"] = os.pathsep.join([str(p) for p in machine_paths]) + os.pathsep + menv["PATH"]
-        self._machine_env = menv
+        (self._build_config, self._host_config) = \
+                env.generate_machine_configs(build_machine=self._build_machine,
+                                             build_sdk_prefix=None,
+                                             host_machine=self._host_machine,
+                                             host_sdk_prefix=None,
+                                             toolchain_prefix=self._toolchain_prefix,
+                                             default_library=self._default_library,
+                                             environ=menv,
+                                             call_selected_meson=self._call_meson,
+                                             outdir=envdir)
+        self._build_env = self._build_config.make_merged_environment(os.environ)
+        self._host_env = self._host_config.make_merged_environment(os.environ)
 
     def _clone_repo_if_needed(self, pkg: PackageSpec):
         sourcedir = self._get_sourcedir(pkg)
@@ -557,15 +555,17 @@ class Builder:
         if builddir.exists():
             shutil.rmtree(builddir)
 
-        machine_file_opts = [f"--native-file={self._native_file}"]
+        machine_file_opts = [f"--native-file={self._build_config.machine_file}"]
         pc_opts = [f"-Dpkg_config_path={prefix / machine.libdatadir / 'pkgconfig'}"]
-        if self._cross_file is not None and machine == self._host_machine:
-            machine_file_opts += [f"--cross-file={self._cross_file}"]
+        if self._host_config is not self._build_config and machine is self._host_machine:
+            machine_file_opts += [f"--cross-file={self._host_config.machine_file}"]
             pc_path_for_build = self._get_prefix(self._build_machine, runtime) / self._build_machine.libdatadir / "pkgconfig"
             pc_opts += [f"-Dbuild.pkg_config_path={pc_path_for_build}"]
 
+        menv = self._host_env if machine is self._host_machine else self._build_env
+
         meson_kwargs = {
-            "env": self._machine_env,
+            "env": menv,
             "check": True,
         }
         if not self._verbose:
@@ -599,7 +599,7 @@ class Builder:
                                                         cwd=builddir,
                                                         capture_output=True,
                                                         encoding="utf-8",
-                                                        env=self._machine_env).stdout)
+                                                        env=menv).stdout)
         for installed_path in install_locations.values():
             manifest_lines.append(Path(installed_path).relative_to(prefix).as_posix())
         manifest_lines.sort()

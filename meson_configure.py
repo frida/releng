@@ -1,7 +1,7 @@
 import argparse
-import json
 import os
 from pathlib import Path
+import pickle
 import platform
 import shlex
 import shutil
@@ -138,7 +138,6 @@ def configure(sourcedir: Path,
         "-Db_ndebug=true",
         "-Db_vscrt=mt",
     ]
-    extra_paths = []
 
     deps_dir = deps.detect_cache_dir(sourcedir)
 
@@ -165,8 +164,6 @@ def configure(sourcedir: Path,
                     return 70
         else:
             toolchain_prefix = None
-    if toolchain_prefix is not None:
-        extra_paths += [toolchain_prefix / "bin"]
 
     is_cross_build = host_machine != build_machine
 
@@ -196,29 +193,21 @@ def configure(sourcedir: Path,
             return 6
 
     try:
-        native_file, cross_file, machine_paths, machine_env = \
-                env.generate_machine_files(build_machine, build_sdk_prefix,
-                                           host_machine, host_sdk_prefix,
-                                           toolchain_prefix, default_library,
-                                           os.environ, call_selected_meson,
-                                           builddir)
+        build_config, host_config = env.generate_machine_configs(build_machine, build_sdk_prefix,
+                                                                 host_machine, host_sdk_prefix,
+                                                                 toolchain_prefix, default_library,
+                                                                 os.environ, call_selected_meson,
+                                                                 builddir)
     except Exception as e:
-        print(f"Unable to generate machine files: {e}", file=sys.stderr)
+        print(f"Unable to generate machine configurations: {e}", file=sys.stderr)
         return 7
-    meson_options += [f"--native-file={native_file}"]
-    if cross_file is not None:
-        meson_options += [f"--cross-file={cross_file}"]
-    extra_paths += machine_paths
-
-    raw_extra_paths = [str(p) for p in extra_paths]
-
-    meson_env = {**os.environ, **machine_env}
-    if raw_extra_paths:
-        meson_env["PATH"] = os.pathsep.join(raw_extra_paths) + os.pathsep + meson_env["PATH"]
+    meson_options += [f"--native-file={build_config.machine_file}"]
+    if host_config is not build_config:
+        meson_options += [f"--cross-file={host_config.machine_file}"]
 
     process = call_selected_meson(["setup"] + meson_options + extra_meson_options + [builddir],
                                   cwd=sourcedir,
-                                  env=meson_env)
+                                  env=host_config.make_merged_environment(os.environ))
 
     makefile_path = builddir / "Makefile"
     if not makefile_path.exists():
@@ -237,12 +226,11 @@ def configure(sourcedir: Path,
                     .replace('.\\build', ".")
             (builddir / "make.bat").write_text(out_of_tree)
 
-    env_config = {
+    (builddir / "frida-env.dat").write_bytes(pickle.dumps({
         "meson": meson,
-        "paths": raw_extra_paths,
-        "env": machine_env,
-    }
-    (builddir / "frida-env-config.json").write_text(json.dumps(env_config, indent=2), encoding="utf-8")
+        "build": build_config,
+        "host": host_config if host_config is not build_config else None,
+    }))
 
     return process.returncode
 

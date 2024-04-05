@@ -1,7 +1,7 @@
 import argparse
-import json
 import os
 from pathlib import Path
+import pickle
 import shlex
 import shutil
 import sys
@@ -43,13 +43,6 @@ def make(sourcedir: Path, builddir: Path, targets: List[str]):
         if exit_status != 0:
             return exit_status
 
-    env_config = json.loads((builddir / "frida-env-config.json").read_text(encoding="utf-8"))
-
-    meson_env = {**os.environ, **env_config["env"]}
-    paths = env_config["paths"]
-    if paths:
-        meson_env["PATH"] = os.pathsep.join(paths) + os.pathsep + meson_env["PATH"]
-
     compile_options = []
     if os.environ.get("V", None) == "1":
         compile_options += ["-v"]
@@ -64,9 +57,16 @@ def make(sourcedir: Path, builddir: Path, targets: List[str]):
         "test": ["test"] + test_options,
     }
 
+    env_state = pickle.loads((builddir / "frida-env.dat").read_bytes())
+
+    machine_config = env_state["host"]
+    if machine_config is None:
+        machine_config = env_state["build"]
+    meson_env = machine_config.make_merged_environment(os.environ)
+
     def do_meson_command(args):
         return env.call_meson(args,
-                              use_submodule=env_config["meson"] == "internal",
+                              use_submodule=env_state["meson"] == "internal",
                               cwd=builddir,
                               env=meson_env).returncode
 

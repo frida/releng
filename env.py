@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from configparser import ConfigParser
-import io
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import platform
@@ -12,6 +12,24 @@ from typing import Callable, Literal, Optional
 from . import env_android, env_apple, env_generic, machine_file
 from .machine_file import bool_to_meson, str_to_meson, strv_to_meson
 from .machine_spec import MachineSpec
+
+
+@dataclass
+class MachineConfig:
+    machine_file: Path
+    binpath: list[Path]
+    environ: dict[str, str]
+
+    def make_merged_environment(self, source_environ: dict[str, str]) -> dict[str, str]:
+        menv = {**source_environ}
+        menv.update(self.environ)
+
+        if self.binpath:
+            old_path = menv.get("PATH", "")
+            old_dirs = old_path.split(os.pathsep) if old_path else []
+            menv["PATH"] = os.pathsep.join([str(p) for p in self.binpath] + old_dirs)
+
+        return menv
 
 
 DefaultLibrary = Literal["shared", "static"]
@@ -45,15 +63,15 @@ def detect_default_prefix() -> Path:
     return Path("/usr/local")
 
 
-def generate_machine_files(build_machine: MachineSpec,
-                           build_sdk_prefix: Optional[Path],
-                           host_machine: MachineSpec,
-                           host_sdk_prefix: Optional[Path],
-                           toolchain_prefix: Optional[Path],
-                           default_library: DefaultLibrary,
-                           environ: dict[str, str],
-                           call_selected_meson: Callable,
-                           outdir: Path):
+def generate_machine_configs(build_machine: MachineSpec,
+                             build_sdk_prefix: Optional[Path],
+                             host_machine: MachineSpec,
+                             host_sdk_prefix: Optional[Path],
+                             toolchain_prefix: Optional[Path],
+                             default_library: DefaultLibrary,
+                             environ: dict[str, str],
+                             call_selected_meson: Callable,
+                             outdir: Path) -> tuple[MachineConfig, MachineConfig]:
     is_cross_build = host_machine != build_machine
 
     if is_cross_build:
@@ -61,7 +79,7 @@ def generate_machine_files(build_machine: MachineSpec,
     else:
         build_environ = environ
 
-    build_config, build_machine_path, build_machine_env = \
+    build_config = \
             generate_machine_config(build_machine,
                                     build_sdk_prefix,
                                     build_machine,
@@ -69,45 +87,23 @@ def generate_machine_files(build_machine: MachineSpec,
                                     toolchain_prefix,
                                     default_library,
                                     build_environ,
-                                    call_selected_meson)
+                                    call_selected_meson,
+                                    outdir)
 
     if is_cross_build:
-        host_config, host_machine_path, host_machine_env = \
-                generate_machine_config(host_machine,
-                                        host_sdk_prefix,
-                                        build_machine,
-                                        is_cross_build,
-                                        toolchain_prefix,
-                                        default_library,
-                                        environ,
-                                        call_selected_meson)
+        host_config = generate_machine_config(host_machine,
+                                              host_sdk_prefix,
+                                              build_machine,
+                                              is_cross_build,
+                                              toolchain_prefix,
+                                              default_library,
+                                              environ,
+                                              call_selected_meson,
+                                              outdir)
     else:
-        host_config = None
-        host_machine_path = []
-        host_machine_env = {}
+        host_config = build_config
 
-    outdir.mkdir(parents=True, exist_ok=True)
-    build_file = write_machine_file(build_machine, build_config, outdir)
-    host_file = write_machine_file(host_machine, host_config, outdir)
-
-    return (
-        build_file,
-        host_file,
-        build_machine_path + host_machine_path,
-        {**build_machine_env, **host_machine_env},
-    )
-
-
-def write_machine_file(machine: MachineSpec,
-                       config: Optional[str],
-                       build_dir: Path) -> Path:
-    if config is None:
-        return None
-
-    f = build_dir / f"frida-{machine.identifier}.txt"
-    f.write_text(config, encoding="utf-8")
-
-    return f
+    return (build_config, host_config)
 
 
 def generate_machine_config(machine: MachineSpec,
@@ -117,7 +113,8 @@ def generate_machine_config(machine: MachineSpec,
                             toolchain_prefix: Optional[Path],
                             default_library: DefaultLibrary,
                             environ: dict[str, str],
-                            call_selected_meson: Callable) -> Optional[str]:
+                            call_selected_meson: Callable,
+                            outdir: Path) -> MachineConfig:
     config = ConfigParser(dict_type=OrderedDict)
     config["constants"] = OrderedDict()
     config["binaries"] = OrderedDict()
@@ -213,10 +210,12 @@ def generate_machine_config(machine: MachineSpec,
         if wrapper is not None:
             binaries["exe_wrapper"] = strv_to_meson(wrapper)
 
-    sink = io.StringIO()
-    config.write(sink)
+    outdir.mkdir(parents=True, exist_ok=True)
+    machine_file = outdir / f"frida-{machine.identifier}.txt"
+    with machine_file.open("w", encoding="utf-8") as f:
+        config.write(f)
 
-    return (sink.getvalue(), machine_path, machine_env)
+    return MachineConfig(machine_file, machine_path, machine_env)
 
 
 def needs_exe_wrapper(machine: MachineSpec,
