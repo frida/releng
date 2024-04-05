@@ -381,6 +381,7 @@ options = [
 ]
 dependencies = [
     "zlib",
+    { id = "zlib", for_machine = "build" },
 ]
 
 [libcxx]
