@@ -3,7 +3,6 @@ from configparser import ConfigParser
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 from typing import Callable, Optional, Mapping, Sequence
 
@@ -117,32 +116,28 @@ def init_machine_config(machine: MachineSpec,
 
     if cc is None:
         if machine.os == "windows":
-            wrapper_env = OrderedDict([
-                ("INCLUDE", ";".join([str(path) for path in winenv.detect_msvs_include_path(toolchain_prefix)])),
-                ("LIB", ";".join([str(path) for path in winenv.detect_msvs_library_path(machine, toolchain_prefix)]))
-            ])
-            runtime_dirs = winenv.detect_msvs_runtime_path(machine, build_machine, toolchain_prefix)
-            outpath.extend(runtime_dirs)
-
-            cc = emit_msvc_tool_wrapper(machine, "cl.exe", toolchain_prefix, wrapper_env, runtime_dirs, outdir)
-            lib = emit_msvc_tool_wrapper(machine, "lib.exe", toolchain_prefix, wrapper_env, runtime_dirs, outdir)
-            link = emit_msvc_tool_wrapper(machine, "link.exe", toolchain_prefix, wrapper_env, runtime_dirs, outdir)
+            cc = [str(winenv.detect_msvs_tool_path(machine, "cl.exe", toolchain_prefix))]
+            lib = [str(winenv.detect_msvs_tool_path(machine, "lib.exe", toolchain_prefix))]
+            link = [str(winenv.detect_msvs_tool_path(machine, "link.exe", toolchain_prefix))]
             assembler_name = MSVC_ASSEMBLER_NAMES[machine.arch]
-            assembler_wrapper = emit_msvc_tool_wrapper(machine, assembler_name + ".exe", toolchain_prefix, wrapper_env,
-                                                       runtime_dirs, outdir)
+            assembler_tool = [str(winenv.detect_msvs_tool_path(machine, assembler_name + ".exe", toolchain_prefix))]
 
             raw_cc = strv_to_meson(cc) + " + common_flags"
             binaries["c"] = raw_cc
             binaries["cpp"] = raw_cc
             binaries["lib"] = strv_to_meson(lib) + " + common_flags"
             binaries["link"] = strv_to_meson(link) + " + common_flags"
-            binaries[assembler_name] = strv_to_meson(assembler_wrapper) + " + common_flags"
+            binaries[assembler_name] = strv_to_meson(assembler_tool) + " + common_flags"
+
+            runtime_dirs = winenv.detect_msvs_runtime_path(machine, build_machine, toolchain_prefix)
+            outpath.extend(runtime_dirs)
 
             vs_dir = winenv.detect_msvs_installation_dir(toolchain_prefix)
             outenv["VSINSTALLDIR"] = str(vs_dir) + "\\"
             outenv["VCINSTALLDIR"] = str(vs_dir / "VC") + "\\"
             outenv["Platform"] = winenv.msvc_platform_from_arch(machine.arch)
-
+            outenv["INCLUDE"] = ";".join([str(path) for path in winenv.detect_msvs_include_path(toolchain_prefix)])
+            outenv["LIB"] = ";".join([str(path) for path in winenv.detect_msvs_library_path(machine, toolchain_prefix)])
         elif machine != build_machine \
                 and "CC" not in environ \
                 and "CFLAGS" not in environ \
@@ -258,56 +253,6 @@ def detect_linker_flavor(cc: list[str]) -> str:
 
     excerpt = linker_version.split("\n")[0].rstrip()
     raise LinkerDetectionError(f"unknown linker: '{excerpt}'")
-
-
-def emit_msvc_tool_wrapper(machine: MachineSpec,
-                           tool: str,
-                           toolchain_prefix: Optional[Path],
-                           environ: Mapping[str, str],
-                           runtime_dirs: Sequence[Path],
-                           outdir: Path) -> list[str]:
-    tool_binary = winenv.detect_msvs_tool_path(machine, tool, toolchain_prefix)
-
-    raw_env_items = [f'    r"{k}": r"{v}",' for k, v in environ.items()]
-    raw_env = "\n".join([
-        "{",
-        "    **os.environ,",
-        *raw_env_items,
-        "}",
-    ])
-
-    raw_runtime_items = ['    r"' + str(d) + '",' for d in runtime_dirs]
-    raw_runtime_dirs = "\n".join([
-        "[",
-        *raw_runtime_items,
-        "]",
-    ])
-
-    script = "\n".join([
-        "import os",
-        "import subprocess",
-        "import sys",
-        "",
-        "",
-        f'tool = r"{tool_binary}"',
-        "",
-        f"env = {raw_env}",
-        "",
-        f"runtime_dirs = {raw_runtime_dirs}",
-        'orig_path = env.get("PATH", "")',
-        "orig_dirs = orig_path.split(os.pathsep) if orig_path else []",
-        'env["PATH"] = os.pathsep.join(runtime_dirs + orig_dirs)',
-        "",
-        f'process = subprocess.run([tool] + sys.argv[1:], env=env)',
-        "",
-        "sys.exit(process.returncode)",
-    ])
-
-    outdir.mkdir(parents=True, exist_ok=True)
-    wrapper = outdir / f"frida-{machine.identifier}-{tool_binary.stem}.py"
-    wrapper.write_text(script, encoding="utf-8")
-
-    return [sys.executable, str(wrapper)]
 
 
 class CompilerNotFoundError(Exception):
