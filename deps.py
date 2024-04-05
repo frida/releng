@@ -38,12 +38,14 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
+    default_machine = MachineSpec.make_from_local_system().identifier
+
     bundle_opt_kwargs = {
-        "help": "Bundle",
+        "help": "bundle (default: sdk)",
         "type": parse_bundle_option_value,
     }
     host_opt_kwargs = {
-        "help": "OS/arch",
+        "help": f"os/arch (default: {default_machine})",
         "type": MachineSpec.parse,
     }
 
@@ -63,7 +65,7 @@ def main():
 
     command = subparsers.add_parser("build", help="build prebuilt dependencies")
     command.add_argument("--bundle", default=Bundle.SDK, **bundle_opt_kwargs)
-    command.add_argument("--host", default=MachineSpec.make_from_local_system().identifier, **host_opt_kwargs)
+    command.add_argument("--host", default=default_machine, **host_opt_kwargs)
     command.add_argument("--only", help="only build packages A, B, and C", metavar="A,B,C",
                          type=parse_set_option_value)
     command.add_argument("--exclude", help="exclude packages A, B, and C", metavar="A,B,C",
