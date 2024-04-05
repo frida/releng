@@ -162,7 +162,8 @@ def generate_machine_config(machine: MachineSpec,
                                              ("glib-genmarshal", ""),
                                              ("glib-mkenums", ""),
                                              ("flex", exe_suffix),
-                                             ("bison", exe_suffix)}:
+                                             ("bison", exe_suffix),
+                                             ("nasm", exe_suffix)}:
             tool_path = toolchain_bindir / (tool_name + filename_suffix)
             if tool_path.exists():
                 if tool_name == "bison":
