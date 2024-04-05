@@ -30,7 +30,7 @@ sys.path.insert(0, str(RELENG_DIR / "tomlkit"))
 
 from tomlkit.toml_file import TOMLFile
 
-from releng import env, winenv
+from releng import env
 from releng.machine_spec import MachineSpec
 
 
