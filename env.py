@@ -60,13 +60,13 @@ def detect_default_prefix() -> Path:
 
 
 def generate_machine_configs(build_machine: MachineSpec,
-                             build_sdk_prefix: Optional[Path],
                              host_machine: MachineSpec,
-                             host_sdk_prefix: Optional[Path],
-                             toolchain_prefix: Optional[Path],
-                             default_library: DefaultLibrary,
                              environ: dict[str, str],
+                             toolchain_prefix: Optional[Path],
+                             build_sdk_prefix: Optional[Path],
+                             host_sdk_prefix: Optional[Path],
                              call_selected_meson: Callable,
+                             default_library: DefaultLibrary,
                              outdir: Path) -> tuple[MachineConfig, MachineConfig]:
     is_cross_build = host_machine != build_machine
 
@@ -77,24 +77,24 @@ def generate_machine_configs(build_machine: MachineSpec,
 
     build_config = \
             generate_machine_config(build_machine,
-                                    build_sdk_prefix,
                                     build_machine,
                                     is_cross_build,
-                                    toolchain_prefix,
-                                    default_library,
                                     build_environ,
+                                    toolchain_prefix,
+                                    build_sdk_prefix,
                                     call_selected_meson,
+                                    default_library,
                                     outdir)
 
     if is_cross_build:
         host_config = generate_machine_config(host_machine,
-                                              host_sdk_prefix,
                                               build_machine,
                                               is_cross_build,
-                                              toolchain_prefix,
-                                              default_library,
                                               environ,
+                                              toolchain_prefix,
+                                              host_sdk_prefix,
                                               call_selected_meson,
+                                              default_library,
                                               outdir)
     else:
         host_config = build_config
@@ -103,13 +103,13 @@ def generate_machine_configs(build_machine: MachineSpec,
 
 
 def generate_machine_config(machine: MachineSpec,
-                            sdk_prefix: Optional[Path],
                             build_machine: MachineSpec,
                             is_cross_build: bool,
-                            toolchain_prefix: Optional[Path],
-                            default_library: DefaultLibrary,
                             environ: dict[str, str],
+                            toolchain_prefix: Optional[Path],
+                            sdk_prefix: Optional[Path],
                             call_selected_meson: Callable,
+                            default_library: DefaultLibrary,
                             outdir: Path) -> MachineConfig:
     config = ConfigParser(dict_type=OrderedDict)
     config["constants"] = OrderedDict()
@@ -128,6 +128,9 @@ def generate_machine_config(machine: MachineSpec,
     binaries = config["binaries"]
     properties = config["properties"]
 
+    outpath = []
+    outenv = OrderedDict()
+
     if machine.is_apple:
         impl = env_apple
     elif machine.os == "android":
@@ -135,13 +138,17 @@ def generate_machine_config(machine: MachineSpec,
     else:
         impl = env_generic
 
-    machine_path, machine_env = impl.init_machine_config(machine,
-                                                         sdk_prefix,
-                                                         build_machine,
-                                                         is_cross_build,
-                                                         environ,
-                                                         call_selected_meson,
-                                                         config)
+    impl.init_machine_config(machine,
+                             build_machine,
+                             is_cross_build,
+                             environ,
+                             toolchain_prefix,
+                             sdk_prefix,
+                             call_selected_meson,
+                             config,
+                             outpath,
+                             outenv,
+                             outdir)
 
     if toolchain_prefix is not None:
         toolchain_bindir = toolchain_prefix / "bin"
@@ -149,7 +156,7 @@ def generate_machine_config(machine: MachineSpec,
 
         ninja_binary = toolchain_bindir / f"ninja{exe_suffix}"
         if ninja_binary.exists():
-            machine_env["NINJA"] = str(ninja_binary)
+            outenv["NINJA"] = str(ninja_binary)
 
         for (tool_name, filename_suffix) in {("gdbus-codegen", ""),
                                              ("gio-querymodules", exe_suffix),
@@ -163,8 +170,8 @@ def generate_machine_config(machine: MachineSpec,
             tool_path = toolchain_bindir / (tool_name + filename_suffix)
             if tool_path.exists():
                 if tool_name == "bison":
-                    machine_env["BISON_PKGDATADIR"] = str(toolchain_prefix / "share" / "bison")
-                    machine_env["M4"] = str(toolchain_bindir / f"m4{exe_suffix}")
+                    outenv["BISON_PKGDATADIR"] = str(toolchain_prefix / "share" / "bison")
+                    outenv["M4"] = str(toolchain_bindir / f"m4{exe_suffix}")
             else:
                 tool_path = shutil.which(tool_name)
             if tool_path is not None:
@@ -200,7 +207,7 @@ def generate_machine_config(machine: MachineSpec,
         pkg_config_path = [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
         config["built-in options"]["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
-    needs_wrapper = needs_exe_wrapper(machine, build_machine, environ)
+    needs_wrapper = needs_exe_wrapper(build_machine, machine, environ)
     properties["needs_exe_wrapper"] = bool_to_meson(needs_wrapper)
     if needs_wrapper:
         wrapper = find_exe_wrapper(machine, environ)
@@ -212,7 +219,7 @@ def generate_machine_config(machine: MachineSpec,
     with machine_file.open("w", encoding="utf-8") as f:
         config.write(f)
 
-    return MachineConfig(machine_file, machine_path, machine_env)
+    return MachineConfig(machine_file, outpath, outenv)
 
 
 def needs_exe_wrapper(build_machine: MachineSpec,

@@ -8,15 +8,16 @@ from .machine_spec import MachineSpec
 
 
 def init_machine_config(machine: MachineSpec,
-                        sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
                         is_cross_build: bool,
                         environ: dict[str, str],
+                        toolchain_prefix: Optional[Path],
+                        sdk_prefix: Optional[Path],
                         call_selected_meson: Callable,
-                        config: ConfigParser):
-    machine_path = []
-    machine_env = {}
-
+                        config: ConfigParser,
+                        outpath: list[str],
+                        outenv: dict[str, str],
+                        outdir: Path):
     ndk_found = False
     try:
         ndk_root = Path(environ["ANDROID_NDK_ROOT"])
@@ -100,8 +101,6 @@ def init_machine_config(machine: MachineSpec,
     options["c_link_args"] = "linker_flags"
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["b_lundef"] = "true"
-
-    return (machine_path, machine_env)
 
 
 class NdkNotFoundError(Exception):

@@ -4,26 +4,27 @@ import os
 from pathlib import Path
 import platform
 import subprocess
+from typing import Optional
 if platform.system() == "Windows":
     import winreg
 
+from .machine_spec import MachineSpec
 
-RELENG_DIR = Path(__file__).resolve().parent
-ROOT_DIR = RELENG_DIR.parent
-TOOLCHAIN_DIR = ROOT_DIR / "deps" / "toolchain-windows-x86"
 
 cached_msvs_dir = None
 cached_msvc_dir = None
 cached_winsdk = None
 
 
-def detect_msvs_installation_dir():
+def detect_msvs_installation_dir(toolchain_prefix: Optional[Path]) -> Path:
     global cached_msvs_dir
     if cached_msvs_dir is None:
         vswhere = Path(os.environ.get("ProgramFiles(x86)", os.environ["ProgramFiles"])) \
                 / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
         if not vswhere.exists():
-            vswhere = TOOLCHAIN_DIR / "bin" / "vswhere.exe"
+            if toolchain_prefix is None:
+                raise MissingDependencyError("unable to locate vswhere.exe")
+            vswhere = toolchain_prefix / "bin" / "vswhere.exe"
         installations = json.loads(
             subprocess.run([
                                vswhere,
@@ -41,10 +42,10 @@ def detect_msvs_installation_dir():
     return cached_msvs_dir
 
 
-def detect_msvc_tool_dir():
+def detect_msvc_tool_dir(toolchain_prefix: Optional[Path]) -> Path:
     global cached_msvc_dir
     if cached_msvc_dir is None:
-        msvs_dir = detect_msvs_installation_dir()
+        msvs_dir = detect_msvs_installation_dir(toolchain_prefix)
         version = sorted((msvs_dir / "VC" / "Tools" / "MSVC").glob("*.*.*"),
                          key=attrgetter("name"),
                          reverse=True)[0].name
@@ -52,7 +53,7 @@ def detect_msvc_tool_dir():
     return cached_msvc_dir
 
 
-def detect_windows_sdk():
+def detect_windows_sdk() -> tuple[Path, str]:
     global cached_winsdk
     if cached_winsdk is None:
         try:
@@ -71,18 +72,19 @@ def detect_windows_sdk():
     return cached_winsdk
 
 
-def detect_msvs_tool_path(machine, tool):
-    if machine.arch == "x86_64":
-        return Path(detect_msvc_tool_dir()) / "bin" / "HostX86" / "x64" / tool
-    else:
-        return Path(detect_msvc_tool_dir()) / "bin" / "HostX86" / "x86" / tool
+def detect_msvs_tool_path(machine: MachineSpec,
+                          tool: str,
+                          toolchain_prefix: Optional[Path]) -> Path:
+    return detect_msvc_tool_dir(toolchain_prefix) / "bin" / "HostX86" / machine.msvc_platform / tool
 
 
-def detect_msvs_runtime_path(machine, build_machine):
+def detect_msvs_runtime_path(machine: MachineSpec,
+                             build_machine: MachineSpec,
+                             toolchain_prefix: Optional[Path]) -> list[Path]:
     msvc_platform = msvc_platform_from_arch(machine.arch)
     native_msvc_platform = msvc_platform_from_arch(build_machine.arch)
 
-    msvc_dir = detect_msvc_tool_dir()
+    msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
     msvc_bindir = msvc_dir / "bin" / ("Host" + native_msvc_platform) / msvc_platform
 
     msvc_dll_dirs = []
@@ -95,9 +97,9 @@ def detect_msvs_runtime_path(machine, build_machine):
     return [winsdk_bindir, msvc_bindir] + msvc_dll_dirs
 
 
-def detect_msvs_include_path():
-    msvc_dir = detect_msvc_tool_dir()
-    vc_dir = detect_msvs_installation_dir() / "VC"
+def detect_msvs_include_path(toolchain_prefix: Optional[Path]) -> list[Path]:
+    msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
+    vc_dir = detect_msvs_installation_dir(toolchain_prefix) / "VC"
 
     (winsdk_dir, winsdk_version) = detect_windows_sdk()
     winsdk_inc_dirs = [
@@ -113,11 +115,12 @@ def detect_msvs_include_path():
     ] + winsdk_inc_dirs
 
 
-def detect_msvs_library_path(machine):
+def detect_msvs_library_path(machine: MachineSpec,
+                             toolchain_prefix: Optional[Path]) -> list[Path]:
     msvc_platform = msvc_platform_from_arch(machine.arch)
 
-    msvc_dir = detect_msvc_tool_dir()
-    vc_dir = detect_msvs_installation_dir() / "VC"
+    msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
+    vc_dir = detect_msvs_installation_dir(toolchain_prefix) / "VC"
 
     (winsdk_dir, winsdk_version) = detect_windows_sdk()
     winsdk_lib_dir = winsdk_dir / "Lib" / winsdk_version / "um" / msvc_platform

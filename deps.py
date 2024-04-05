@@ -443,9 +443,10 @@ class Builder:
         return eval(cond, global_vars)
 
     def _prepare(self):
-        self._toolchain_prefix, toolchain_state = ensure_toolchain(self._build_machine,
-                                                                   self._cachedir,
-                                                                   version=self._params.bootstrap_version)
+        self._toolchain_prefix, toolchain_state = \
+                ensure_toolchain(self._build_machine,
+                                 self._cachedir,
+                                 version=self._params.bootstrap_version)
         if toolchain_state == SourceState.MODIFIED:
             self._wipe_build_state()
 
@@ -479,16 +480,19 @@ class Builder:
             if extra_ldflags:
                 menv["LDFLAGS"] = shlex.join(extra_ldflags + shlex.split(menv.get("LDFLAGS", "")))
 
-        (self._build_config, self._host_config) = \
-                env.generate_machine_configs(build_machine=self._build_machine,
-                                             build_sdk_prefix=None,
-                                             host_machine=self._host_machine,
-                                             host_sdk_prefix=None,
-                                             toolchain_prefix=self._toolchain_prefix,
-                                             default_library=self._default_library,
-                                             environ=menv,
-                                             call_selected_meson=self._call_meson,
-                                             outdir=envdir)
+        build_sdk_prefix = None
+        host_sdk_prefix = None
+
+        self._build_config, self._host_config = \
+                env.generate_machine_configs(self._build_machine,
+                                             self._host_machine,
+                                             menv,
+                                             self._toolchain_prefix,
+                                             build_sdk_prefix,
+                                             host_sdk_prefix,
+                                             self._call_meson,
+                                             self._default_library,
+                                             envdir)
         self._build_env = self._build_config.make_merged_environment(os.environ)
         self._host_env = self._host_config.make_merged_environment(os.environ)
 

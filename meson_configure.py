@@ -193,11 +193,16 @@ def configure(sourcedir: Path,
             return 6
 
     try:
-        build_config, host_config = env.generate_machine_configs(build_machine, build_sdk_prefix,
-                                                                 host_machine, host_sdk_prefix,
-                                                                 toolchain_prefix, default_library,
-                                                                 os.environ, call_selected_meson,
-                                                                 builddir)
+        build_config, host_config = \
+                env.generate_machine_configs(build_machine,
+                                             host_machine,
+                                             os.environ,
+                                             toolchain_prefix,
+                                             build_sdk_prefix,
+                                             host_sdk_prefix,
+                                             call_selected_meson,
+                                             default_library,
+                                             builddir)
     except Exception as e:
         print(f"Unable to generate machine configurations: {e}", file=sys.stderr)
         return 7

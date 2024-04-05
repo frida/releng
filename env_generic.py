@@ -3,8 +3,9 @@ from configparser import ConfigParser
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
-from typing import Callable, Optional
+from typing import Callable, Optional, Mapping, Sequence
 
 from . import winenv
 from .machine_file import strv_to_meson
@@ -12,15 +13,16 @@ from .machine_spec import MachineSpec
 
 
 def init_machine_config(machine: MachineSpec,
-                        sdk_prefix: Optional[Path],
                         build_machine: MachineSpec,
                         is_cross_build: bool,
                         environ: dict[str, str],
+                        toolchain_prefix: Optional[Path],
+                        sdk_prefix: Optional[Path],
                         call_selected_meson: Callable,
-                        config: ConfigParser):
-    machine_path = []
-    machine_env = {}
-
+                        config: ConfigParser,
+                        outpath: list[str],
+                        outenv: dict[str, str],
+                        outdir: Path):
     allow_undefined_symbols = machine.os == "freebsd"
 
     options = config["built-in options"]
@@ -115,27 +117,32 @@ def init_machine_config(machine: MachineSpec,
 
     if cc is None:
         if machine.os == "windows":
-            cc = [str(winenv.detect_msvs_tool_path(machine, "cl.exe"))]
-            lib = [str(winenv.detect_msvs_tool_path(machine, "lib.exe"))]
-            link = [str(winenv.detect_msvs_tool_path(machine, "link.exe"))]
+            wrapper_env = OrderedDict([
+                ("INCLUDE", ";".join([str(path) for path in winenv.detect_msvs_include_path(toolchain_prefix)])),
+                ("LIB", ";".join([str(path) for path in winenv.detect_msvs_library_path(machine, toolchain_prefix)]))
+            ])
+            runtime_dirs = winenv.detect_msvs_runtime_path(machine, build_machine, toolchain_prefix)
+            outpath.extend(runtime_dirs)
+
+            cc = emit_msvc_tool_wrapper(machine, "cl.exe", toolchain_prefix, wrapper_env, runtime_dirs, outdir)
+            lib = emit_msvc_tool_wrapper(machine, "lib.exe", toolchain_prefix, wrapper_env, runtime_dirs, outdir)
+            link = emit_msvc_tool_wrapper(machine, "link.exe", toolchain_prefix, wrapper_env, runtime_dirs, outdir)
+            assembler_name = MSVC_ASSEMBLER_NAMES[machine.arch]
+            assembler_wrapper = emit_msvc_tool_wrapper(machine, assembler_name + ".exe", toolchain_prefix, wrapper_env,
+                                                       runtime_dirs, outdir)
 
             raw_cc = strv_to_meson(cc) + " + common_flags"
             binaries["c"] = raw_cc
             binaries["cpp"] = raw_cc
             binaries["lib"] = strv_to_meson(lib) + " + common_flags"
             binaries["link"] = strv_to_meson(link) + " + common_flags"
+            binaries[assembler_name] = strv_to_meson(assembler_wrapper) + " + common_flags"
 
-            vc_dir = winenv.detect_msvs_installation_dir() / "VC"
-            vc_installdir = str(vc_dir) + "\\"
+            vs_dir = winenv.detect_msvs_installation_dir(toolchain_prefix)
+            outenv["VSINSTALLDIR"] = str(vs_dir) + "\\"
+            outenv["VCINSTALLDIR"] = str(vs_dir / "VC") + "\\"
+            outenv["Platform"] = winenv.msvc_platform_from_arch(machine.arch)
 
-            machine_env.update({
-                "INCLUDE": ";".join([str(path) for path in winenv.detect_msvs_include_path()]),
-                "LIB": ";".join([str(path) for path in winenv.detect_msvs_library_path(machine)]),
-                "VCINSTALLDIR": vc_installdir,
-                "Platform": winenv.msvc_platform_from_arch(machine.arch),
-            })
-
-            machine_path += winenv.detect_msvs_runtime_path(machine, build_machine)
         elif machine != build_machine \
                 and "CC" not in environ \
                 and "CFLAGS" not in environ \
@@ -210,8 +217,6 @@ def init_machine_config(machine: MachineSpec,
     constants["cxx_like_flags"] = strv_to_meson(cxx_like_flags)
     constants["cxx_link_flags"] = strv_to_meson(cxx_link_flags)
 
-    return (machine_path, machine_env)
-
 
 def resolve_gcc_binaries(toolprefix: str = "") -> tuple[list[str], dict[str, str]]:
     cc = None
@@ -253,6 +258,56 @@ def detect_linker_flavor(cc: list[str]) -> str:
 
     excerpt = linker_version.split("\n")[0].rstrip()
     raise LinkerDetectionError(f"unknown linker: '{excerpt}'")
+
+
+def emit_msvc_tool_wrapper(machine: MachineSpec,
+                           tool: str,
+                           toolchain_prefix: Optional[Path],
+                           environ: Mapping[str, str],
+                           runtime_dirs: Sequence[Path],
+                           outdir: Path) -> list[str]:
+    tool_binary = winenv.detect_msvs_tool_path(machine, tool, toolchain_prefix)
+
+    raw_env_items = [f'    r"{k}": r"{v}",' for k, v in environ.items()]
+    raw_env = "\n".join([
+        "{",
+        "    **os.environ,",
+        *raw_env_items,
+        "}",
+    ])
+
+    raw_runtime_items = ['    r"' + str(d) + '",' for d in runtime_dirs]
+    raw_runtime_dirs = "\n".join([
+        "[",
+        *raw_runtime_items,
+        "]",
+    ])
+
+    script = "\n".join([
+        "import os",
+        "import subprocess",
+        "import sys",
+        "",
+        "",
+        f'tool = r"{tool_binary}"',
+        "",
+        f"env = {raw_env}",
+        "",
+        f"runtime_dirs = {raw_runtime_dirs}",
+        'orig_path = env.get("PATH", "")',
+        "orig_dirs = orig_path.split(os.pathsep) if orig_path else []",
+        'env["PATH"] = os.pathsep.join(runtime_dirs + orig_dirs)',
+        "",
+        f'process = subprocess.run([tool] + sys.argv[1:], env=env)',
+        "",
+        "sys.exit(process.returncode)",
+    ])
+
+    outdir.mkdir(parents=True, exist_ok=True)
+    wrapper = outdir / f"frida-{machine.identifier}-{tool_binary.stem}.py"
+    wrapper.write_text(script, encoding="utf-8")
+
+    return [sys.executable, str(wrapper)]
 
 
 class CompilerNotFoundError(Exception):
@@ -345,4 +400,10 @@ GCC_TOOL_NAMES = {
     "ar": "gcc-ar",
     "nm": "gcc-nm",
     "ranlib": "gcc-ranlib",
+}
+
+MSVC_ASSEMBLER_NAMES = {
+    "x86": "ml",
+    "x86_64": "ml64",
+    "arm64": "armasm64",
 }
