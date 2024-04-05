@@ -85,7 +85,7 @@ class MachineSpec:
         return MachineSpec(bos, detect_arch(), config)
 
     @staticmethod
-    def parse(raw_spec):
+    def parse(raw_spec: str) -> MachineSpec:
         tokens = raw_spec.split("-")
 
         if len(tokens) in {3, 4}:
