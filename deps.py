@@ -353,10 +353,12 @@ class Builder:
             all_deps = itertools.chain.from_iterable([pkg.dependencies for pkg in packages])
             deps_for_build_machine = {dep.identifier for dep in all_deps if dep.for_machine == "build"}
 
-            self._prepare(packages)
+            self._prepare()
             prepare_ended_at = time.time()
 
             for pkg in packages:
+                self._print_package_banner(pkg)
+                self._clone_repo_if_needed(pkg)
                 machines = [self._host_machine]
                 if pkg.identifier in deps_for_build_machine:
                     machines += [self._build_machine]
@@ -427,12 +429,7 @@ class Builder:
         }
         return eval(cond, global_vars)
 
-    def _prepare(self, packages: list[PackageSpec]):
-        for pkg in packages:
-            state = self._grab_and_prepare(pkg)
-            if state == SourceState.MODIFIED:
-                self._wipe_build_state()
-
+    def _prepare(self):
         self._toolchain_prefix, toolchain_state = ensure_toolchain(self._build_machine,
                                                                    self._cachedir,
                                                                    version=self._params.bootstrap_version)
@@ -485,32 +482,28 @@ class Builder:
             menv["PATH"] = os.pathsep.join([str(p) for p in machine_paths]) + os.pathsep + menv["PATH"]
         self._machine_env = menv
 
-    def _grab_and_prepare(self, pkg: PackageSpec) -> SourceState:
+    def _clone_repo_if_needed(self, pkg: PackageSpec):
         sourcedir = self._get_sourcedir(pkg)
-        if sourcedir.exists():
-            if query_git_head(sourcedir) == pkg.version:
-                state = SourceState.PRISTINE
-            else:
-                self._print_package_banner(pkg)
-                subprocess.run(["git", "fetch", "-q"],
-                               cwd=sourcedir,
-                               check=True)
-                subprocess.run(["git", "checkout", "-q", pkg.version],
-                               cwd=sourcedir,
-                               check=True)
-                state = SourceState.MODIFIED
-        else:
-            self._print_package_banner(pkg)
-            sourcedir.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["git", "clone", "-q", "--recurse-submodules", pkg.url, sourcedir.name],
-                           cwd=sourcedir.parent,
-                           check=True)
-            subprocess.run(["git", "checkout", "-q", pkg.version],
-                           cwd=sourcedir,
-                           check=True)
-            state = SourceState.PRISTINE
 
-        return state
+        git = lambda *args: subprocess.run(["git", *args],
+                                           cwd=sourcedir,
+                                           capture_output=True,
+                                           encoding="utf-8",
+                                           check=True)
+
+        if sourcedir.exists():
+            self._print_status(pkg.name, "Reusing existing checkout")
+            current_rev = git("rev-parse", "FETCH_HEAD").stdout.strip()
+            if current_rev != pkg.version:
+                self._print_status(pkg.name, "WARNING: Checkout does not match version in deps.toml")
+        else:
+            self._print_status(pkg.name, "Cloning")
+            sourcedir.mkdir(parents=True, exist_ok=True)
+            git("init")
+            git("remote", "add", "origin", pkg.url)
+            git("fetch", "--depth", "1", "origin", pkg.version)
+            git("checkout", "FETCH_HEAD")
+            git("submodule", "update", "--init", "--recursive", "--depth", "1")
 
     def _wipe_build_state(self):
         for path in (self._get_outdir(), self._get_builddir_container()):
@@ -932,10 +925,6 @@ def parse_dependency(v: Union[str, dict]) -> OptionSpec:
     if isinstance(v, str):
         return DependencySpec(v)
     return DependencySpec(v["id"], v.get("for_machine"), v.get("when"))
-
-
-def query_git_head(repo_path: str) -> str:
-    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_path, encoding="utf-8").strip()
 
 
 def copy_files(fromdir: Path,
