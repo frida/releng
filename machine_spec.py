@@ -214,6 +214,11 @@ class MachineSpec:
         is_msvc = self.os == "windows" and self.config != "mingw"
         return not is_msvc
 
+    def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
+        if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
+            return host_machine
+        return self
+
     def __eq__(self, other):
         if isinstance(other, MachineSpec):
             return other.identifier == self.identifier

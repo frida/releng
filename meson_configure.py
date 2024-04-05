@@ -121,8 +121,8 @@ def configure(sourcedir: Path,
         vs_arch = os.environ.get("VSCMD_ARG_TGT_ARCH", None)
         if vs_arch == "x86":
             host_machine = MachineSpec("windows", "x86", host_machine.config)
-        if build_machine.os == "windows" and build_machine.arch == "x86_64" and host_machine.arch == "x86":
-            build_machine = host_machine
+
+    build_machine = build_machine.maybe_adapt_to_host(host_machine)
 
     if allowed_prebuilds is None:
         allowed_prebuilds = set(query_supported_bundle_types(include_wildcards=False))
