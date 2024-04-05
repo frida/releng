@@ -607,60 +607,6 @@ class Builder:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
-    def _print_package_banner(self, pkg: PackageSpec):
-        if self._ansi_supported:
-            print("\n".join([
-                "",
-                "╭────",
-                f"│ 📦 \033[1m{pkg.name}\033[0m",
-                "├───────────────────────────────────────────────╮",
-                f"│ URL: {pkg.url}",
-                f"│ CID: {pkg.version}",
-                "├───────────────────────────────────────────────╯",
-            ]), flush=True)
-        else:
-            print("\n".join([
-                "",
-                f"# {pkg.name}",
-                f"- URL: {pkg.url}",
-                f"- CID: {pkg.version}",
-            ]), flush=True)
-
-    def _print_packaging_banner(self):
-        if self._ansi_supported:
-            print("\n".join([
-                "",
-                "╭────",
-                f"│ 🏗️  \033[1mPackaging\033[0m",
-                "├───────────────────────────────────────────────╮",
-            ]), flush=True)
-        else:
-            print("\n".join([
-                "",
-                f"# Packaging",
-            ]), flush=True)
-
-    def _print_summary_banner(self):
-        if self._ansi_supported:
-            print("\n".join([
-                "",
-                "╭────",
-                f"│ 🎉 \033[1mDone\033[0m",
-                "├───────────────────────────────────────────────╮",
-            ]), flush=True)
-        else:
-            print("\n".join([
-                "",
-                f"# Done",
-            ]), flush=True)
-
-    def _print_status(self, scope: str, *args):
-        status = " ".join([str(arg) for arg in args])
-        if self._ansi_supported:
-            print(f"│ \033[1m{scope}\033[0m :: {status}", flush=True)
-        else:
-            print(f"# {scope} :: {status}", flush=True)
-
     def _call_meson(self, argv, *args, **kwargs):
         if self._verbose and argv[0] in {"setup", "install"}:
             vanilla_env = os.environ
@@ -842,6 +788,60 @@ class Builder:
 
     def _get_manifest_path(self, pkg: PackageSpec, machine: MachineSpec, runtime: str) -> Path:
         return self._get_prefix(machine, runtime) / "manifest" / f"{pkg.identifier}.pkg"
+
+    def _print_package_banner(self, pkg: PackageSpec):
+        if self._ansi_supported:
+            print("\n".join([
+                "",
+                "╭────",
+                f"│ 📦 \033[1m{pkg.name}\033[0m",
+                "├───────────────────────────────────────────────╮",
+                f"│ URL: {pkg.url}",
+                f"│ CID: {pkg.version}",
+                "├───────────────────────────────────────────────╯",
+            ]), flush=True)
+        else:
+            print("\n".join([
+                "",
+                f"# {pkg.name}",
+                f"- URL: {pkg.url}",
+                f"- CID: {pkg.version}",
+            ]), flush=True)
+
+    def _print_packaging_banner(self):
+        if self._ansi_supported:
+            print("\n".join([
+                "",
+                "╭────",
+                f"│ 🏗️  \033[1mPackaging\033[0m",
+                "├───────────────────────────────────────────────╮",
+            ]), flush=True)
+        else:
+            print("\n".join([
+                "",
+                f"# Packaging",
+            ]), flush=True)
+
+    def _print_summary_banner(self):
+        if self._ansi_supported:
+            print("\n".join([
+                "",
+                "╭────",
+                f"│ 🎉 \033[1mDone\033[0m",
+                "├───────────────────────────────────────────────╮",
+            ]), flush=True)
+        else:
+            print("\n".join([
+                "",
+                f"# Done",
+            ]), flush=True)
+
+    def _print_status(self, scope: str, *args):
+        status = " ".join([str(arg) for arg in args])
+        if self._ansi_supported:
+            print(f"│ \033[1m{scope}\033[0m :: {status}", flush=True)
+        else:
+            print(f"# {scope} :: {status}", flush=True)
 
 
 def vscrt_from_configuration_and_runtime(config: str, runtime: str) -> str:
