@@ -361,7 +361,7 @@ url = "https://github.com/frida/tinycc.git"
 
 [openssl]
 name = "OpenSSL"
-version = "9dd243646cd11180625433c748e914768d9863f4"
+version = "95d037b2acc432039da4f506d25b6a01577d8bc5"
 url = "https://github.com/frida/openssl.git"
 options = [
     "-Dcli=disabled",
