@@ -331,6 +331,8 @@ class Builder:
               excluded_packages: set[str]) -> Path:
         started_at = time.time()
         prepare_ended_at = None
+        clone_time_elapsed = None
+        build_time_elapsed = None
         build_ended_at = None
         packaging_ended_at = None
         try:
@@ -356,13 +358,22 @@ class Builder:
             self._prepare()
             prepare_ended_at = time.time()
 
+            clone_time_elapsed = 0
+            build_time_elapsed = 0
             for pkg in packages:
                 self._print_package_banner(pkg)
+
+                t1 = time.time()
                 self._clone_repo_if_needed(pkg)
+                t2 = time.time()
+                clone_time_elapsed += t2 - t1
+
                 machines = [self._host_machine]
                 if pkg.identifier in deps_for_build_machine:
                     machines += [self._build_machine]
                 self._build_package(pkg, machines)
+                t3 = time.time()
+                build_time_elapsed += t3 - t2
             build_ended_at = time.time()
 
             artifact_file = self._package()
@@ -371,16 +382,17 @@ class Builder:
             ended_at = time.time()
 
             if prepare_ended_at is not None:
-                print("")
-                print("# Time spent")
-                print("")
+                self._print_summary_banner()
                 print("      Total: {}".format(format_duration(ended_at - started_at)))
 
             if prepare_ended_at is not None:
                 print("    Prepare: {}".format(format_duration(prepare_ended_at - started_at)))
 
-            if build_ended_at is not None:
-                print("      Build: {}".format(format_duration(build_ended_at - prepare_ended_at)))
+            if clone_time_elapsed is not None:
+                print("      Clone: {}".format(format_duration(clone_time_elapsed)))
+
+            if build_time_elapsed is not None:
+                print("      Build: {}".format(format_duration(build_time_elapsed)))
 
             if packaging_ended_at is not None:
                 print("  Packaging: {}".format(format_duration(packaging_ended_at - build_ended_at)))
@@ -515,17 +527,17 @@ class Builder:
         for machine in machines:
             for runtime in self._runtimes:
                 manifest_path = self._get_manifest_path(pkg, machine, runtime)
-                if manifest_path.exists():
-                    continue
+                action = "skip" if manifest_path.exists() else "build"
 
-                message = f"Building for {machine.identifier}"
+                message = "Building" if action == "build" else "Already built"
+                message += f" for {machine.identifier}"
                 if len(self._runtimes) > 1:
                     message += f" [{runtime} CRT]"
                 self._print_status(pkg.name, message)
 
-                self._build_package_for_machine(pkg, machine, runtime)
-
-                assert manifest_path.exists()
+                if action == "build":
+                    self._build_package_for_machine(pkg, machine, runtime)
+                    assert manifest_path.exists()
 
     def _build_package_for_machine(self, pkg: PackageSpec, machine: MachineSpec, runtime: str):
         sourcedir = self._get_sourcedir(pkg)
@@ -614,6 +626,34 @@ class Builder:
                 f"- CID: {pkg.version}",
             ]), flush=True)
 
+    def _print_packaging_banner(self):
+        if self._ansi_supported:
+            print("\n".join([
+                "",
+                "╭────",
+                f"│ 🏗️  \033[1mPackaging\033[0m",
+                "├───────────────────────────────────────────────╮",
+            ]), flush=True)
+        else:
+            print("\n".join([
+                "",
+                f"# Packaging",
+            ]), flush=True)
+
+    def _print_summary_banner(self):
+        if self._ansi_supported:
+            print("\n".join([
+                "",
+                "╭────",
+                f"│ 🎉 \033[1mDone\033[0m",
+                "├───────────────────────────────────────────────╮",
+            ]), flush=True)
+        else:
+            print("\n".join([
+                "",
+                f"# Done",
+            ]), flush=True)
+
     def _print_status(self, scope: str, *args):
         status = " ".join([str(arg) for arg in args])
         if self._ansi_supported:
@@ -631,13 +671,14 @@ class Builder:
             env_summary = f" \\\n{indent}".join([f"{k}={shlex.quote(v)}" for k, v in changed_env.items()])
             argv_summary = f" \\\n{3 * indent}".join([str(arg) for arg in argv])
 
-            print(f"> {env_summary} \\\n{indent}meson {argv_summary}")
+            print(f"> {env_summary} \\\n{indent}meson {argv_summary}", flush=True)
 
         return env.call_meson(argv, use_submodule=True, *args, **kwargs)
 
     def _package(self):
         outfile = self._cachedir / f"{self._bundle.name.lower()}-{self._host_machine.identifier}.tar.xz"
 
+        self._print_packaging_banner()
         with tempfile.TemporaryDirectory(prefix="frida-deps") as raw_tempdir:
             tempdir = Path(raw_tempdir)
 
