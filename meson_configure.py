@@ -317,13 +317,13 @@ def register_meson_options(meson_option_file: Path, group: argparse._ArgumentGro
                                action="append_const",
                                const=f"-D{name}={value_to_set}",
                                dest="main_meson_options",
-                               **parse_option_meta(name, opt))
+                               **parse_option_meta(name, action, opt))
             if opt.value == "auto":
                 group.add_argument(f"--disable-{pretty_name}",
                                    action="append_const",
                                    const=f"-D{name}=disabled",
                                    dest="main_meson_options",
-                                   **parse_option_meta(name, opt))
+                                   **parse_option_meta(name, "disable", opt))
         elif isinstance(opt, UserBooleanOption):
             if not opt.value:
                 action = "enable"
@@ -335,24 +335,26 @@ def register_meson_options(meson_option_file: Path, group: argparse._ArgumentGro
                                action="append_const",
                                const=f"-D{name}={value_to_set}",
                                dest="main_meson_options",
-                               **parse_option_meta(name, opt))
+                               **parse_option_meta(name, action, opt))
         elif isinstance(opt, UserComboOption):
             group.add_argument(f"--with-{pretty_name}",
                                choices=opt.choices,
                                dest="meson_option:" + name,
-                               **parse_option_meta(name, opt))
+                               **parse_option_meta(name, "with", opt))
         elif isinstance(opt, UserArrayOption):
             group.add_argument(f"--with-{pretty_name}",
                                dest="meson_option:" + name,
                                type=make_array_option_value_parser(opt),
-                               **parse_option_meta(name, opt))
+                               **parse_option_meta(name, "with", opt))
         else:
             group.add_argument(f"--with-{pretty_name}",
                                dest="meson_option:" + name,
-                               **parse_option_meta(name, opt))
+                               **parse_option_meta(name, "with", opt))
 
 
-def parse_option_meta(name: str, opt: UserOption[Any]):
+def parse_option_meta(name: str,
+                      action: str,
+                      opt: UserOption[Any]):
     params = {}
 
     if isinstance(opt, UserStringOption):
@@ -368,7 +370,13 @@ def parse_option_meta(name: str, opt: UserOption[Any]):
         default_value = str(opt.value).lower()
         metavar = name.upper()
 
-    params["help"] = f"{help_text_from_meson(opt.description)} (default: {default_value})"
+    if not (isinstance(opt, UserFeatureOption) \
+            and opt.value == "auto" \
+            and action == "disable"):
+        text = f"{help_text_from_meson(opt.description)} (default: {default_value})"
+        if action == "disable":
+            text = "do not " + text
+        params["help"] = text
     params["metavar"] = metavar
 
     return params
