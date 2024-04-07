@@ -63,6 +63,7 @@ def make(sourcedir: Path, builddir: Path, targets: List[str]):
     if machine_config is None:
         machine_config = env_state["build"]
     meson_env = machine_config.make_merged_environment(os.environ)
+    meson_env["FRIDA_DEPS"] = str(env_state["deps"])
 
     def do_meson_command(args):
         return env.call_meson(args,

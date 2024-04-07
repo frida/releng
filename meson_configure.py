@@ -235,6 +235,7 @@ def configure(sourcedir: Path,
         "meson": meson,
         "build": build_config,
         "host": host_config if host_config is not build_config else None,
+        "deps": deps_dir,
     }))
 
     return process.returncode
