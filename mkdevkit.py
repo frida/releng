@@ -63,7 +63,10 @@ def main():
         app.run()
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
-        print("Output:", e.output, file=sys.stderr)
+        if e.output:
+            print("Stdout:", e.output, file=sys.stderr)
+        if e.stderr:
+            print("Stderr:", e.stderr, file=sys.stderr)
         sys.exit(1)
 
 
