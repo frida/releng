@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
+from typing import Optional
 
 REPO_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -11,6 +13,26 @@ from releng import devkit, env, machine_spec
 
 
 def main():
+    raw_args: list[str] = []
+    ool_optvals: dict[str, list[str]] = {}
+    pending_raw_args = sys.argv[1:]
+    while len(pending_raw_args) > 0:
+        cur = pending_raw_args.pop(0)
+        if cur == ">>>":
+            ool_hash = hashlib.sha256()
+            ool_strv = []
+            while True:
+                cur = pending_raw_args.pop(0)
+                if cur == "<<<":
+                    break
+                ool_hash.update(cur.encode("utf-8"))
+                ool_strv.append(cur)
+            val_id = "ool:" + ool_hash.hexdigest()
+            ool_optvals[val_id] = ool_strv
+            raw_args.append(val_id)
+        else:
+            raw_args.append(cur)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("kit")
     parser.add_argument("machine",
@@ -25,15 +47,15 @@ def main():
                         default="")
     parser.add_argument("--cc",
                         help="C compiler to use",
-                        type=parse_array_option_value)
+                        type=lambda v: parse_array_option_value(v, ool_optvals))
     machine_options = dict.fromkeys(["c_args", "lib", "libtool", "ar", "nm", "objcopy", "pkg_config", "pkg_config_path"])
     for name in machine_options.keys():
         pretty_name = name.replace("_", "-")
         parser.add_argument("--" + pretty_name,
                             help=f"The {pretty_name} to use",
-                            type=parse_array_option_value)
+                            type=lambda v: parse_array_option_value(v, ool_optvals))
 
-    options = parser.parse_args()
+    options = parser.parse_args(raw_args)
 
     kit = options.kit
     machine = options.machine
@@ -70,10 +92,14 @@ def main():
         sys.exit(1)
 
 
-def parse_array_option_value(raw_array):
-    if raw_array == "":
+def parse_array_option_value(val: str, ool_optvals: dict[str, list[str]]) -> Optional[list[str]]:
+    if val == "":
         return None
-    return raw_array.split("!")
+    if val.startswith("ool:"):
+        ool_val = ool_optvals.get(val)
+        if ool_val is not None:
+            return ool_val
+    return [val]
 
 
 if __name__ == "__main__":
