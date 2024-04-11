@@ -426,10 +426,10 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
     workdir.mkdir(parents=True, exist_ok=True)
 
     run_kwargs = {
-        "check": True,
         "stdout": subprocess.PIPE,
         "stderr": subprocess.STDOUT,
         "encoding": "utf-8",
+        "check": True,
     }
 
     vala_checkout = workdir / "vala"
