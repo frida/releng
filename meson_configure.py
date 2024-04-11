@@ -86,17 +86,25 @@ def main():
 
     allowed_prebuilds = set(query_supported_bundle_types(include_wildcards=False)) - options.without_prebuilds
 
-    exit_status = configure(sourcedir,
-                            builddir,
-                            options.prefix,
-                            options.build,
-                            options.host,
-                            default_library,
-                            allowed_prebuilds,
-                            options.meson,
-                            collect_meson_options(options))
-
-    sys.exit(exit_status)
+    try:
+        configure(sourcedir,
+                  builddir,
+                  options.prefix,
+                  options.build,
+                  options.host,
+                  os.environ,
+                  default_library,
+                  allowed_prebuilds,
+                  options.meson,
+                  collect_meson_options(options))
+    except Exception as e:
+        print(e, file=sys.stderr)
+        if isinstance(e, subprocess.CalledProcessError):
+            for label, data in [("Output", e.output),
+                                ("Stderr", e.stderr)]:
+                if data:
+                    print(f"{label}:\n\t| " + "\n\t| ".join(data.strip().split("\n")), file=sys.stderr)
+        sys.exit(1)
 
 
 def configure(sourcedir: Path,
@@ -104,10 +112,12 @@ def configure(sourcedir: Path,
               prefix: Optional[str] = None,
               build_machine: Optional[MachineSpec] = None,
               host_machine: Optional[MachineSpec] = None,
+              environ: dict[str, str] = os.environ,
               default_library: str = "static",
               allowed_prebuilds: Sequence[str] = None,
               meson: str = "internal",
-              extra_meson_options: List[str] = []):
+              extra_meson_options: List[str] = [],
+              call_meson: Callable = env.call_meson):
     if prefix is None:
         prefix = env.detect_default_prefix()
 
@@ -118,7 +128,7 @@ def configure(sourcedir: Path,
         host_machine = build_machine
 
     if host_machine.os == "windows":
-        vs_arch = os.environ.get("VSCMD_ARG_TGT_ARCH", None)
+        vs_arch = environ.get("VSCMD_ARG_TGT_ARCH")
         if vs_arch == "x86":
             host_machine = MachineSpec("windows", "x86", host_machine.config)
 
@@ -127,9 +137,10 @@ def configure(sourcedir: Path,
     if allowed_prebuilds is None:
         allowed_prebuilds = set(query_supported_bundle_types(include_wildcards=False))
 
-    call_selected_meson = lambda argv, *args, **kwargs: env.call_meson(argv,
-                                                                       use_submodule=meson == "internal",
-                                                                       *args, **kwargs)
+    call_selected_meson = lambda argv, *args, **kwargs: call_meson(argv,
+                                                                   use_submodule=meson == "internal",
+                                                                   *args,
+                                                                   **kwargs)
 
     meson_options = [
         f"-Dprefix={prefix}",
@@ -146,11 +157,10 @@ def configure(sourcedir: Path,
         try:
             toolchain_prefix, _ = deps.ensure_toolchain(build_machine, deps_dir)
         except deps.BundleNotFoundError as e:
-            print_toolchain_not_found_error(e)
-            return 1
-        except Exception as e:
-            print_toolchain_unknown_error(e)
-            return 2
+            raise ToolchainNotFoundError("\n".join([
+                f"Unable to download toolchain: {e}",
+                "Specify --without-prebuilds=toolchain to only use tools on your PATH.",
+            ]))
     else:
         if project_depends_on_vala_compiler(sourcedir):
             toolchain_prefix = deps.query_toolchain_prefix(build_machine, deps_dir)
@@ -175,44 +185,40 @@ def configure(sourcedir: Path,
         try:
             build_sdk_prefix, _ = deps.ensure_sdk(build_machine, deps_dir)
         except deps.BundleNotFoundError as e:
-            print_sdk_not_found_error(e)
-            return 3
-        except Exception as e:
-            print_sdk_unknown_error(e)
-            return 4
+            raise SDKNotFoundError("\n".join([
+                f"Unable to download SDK: {e}",
+                "Specify --without-prebuilds=sdk:build to build dependencies from source code.",
+            ]))
 
     host_sdk_prefix = None
     if is_cross_build and "sdk:host" in allowed_prebuilds:
         try:
             host_sdk_prefix, _ = deps.ensure_sdk(host_machine, deps_dir)
         except deps.BundleNotFoundError as e:
-            print_sdk_not_found_error(e)
-            return 5
-        except Exception as e:
-            print_sdk_unknown_error(e)
-            return 6
+            raise SDKNotFoundError("\n".join([
+                f"Unable to download SDK: {e}",
+                "Specify --without-prebuilds=sdk:host to build dependencies from source code.",
+            ]))
 
-    try:
-        build_config, host_config = \
-                env.generate_machine_configs(build_machine,
-                                             host_machine,
-                                             os.environ,
-                                             toolchain_prefix,
-                                             build_sdk_prefix,
-                                             host_sdk_prefix,
-                                             call_selected_meson,
-                                             default_library,
-                                             builddir)
-    except Exception as e:
-        print(f"Unable to generate machine configurations: {e}", file=sys.stderr)
-        return 7
+    build_config, host_config = \
+            env.generate_machine_configs(build_machine,
+                                         host_machine,
+                                         environ,
+                                         toolchain_prefix,
+                                         build_sdk_prefix,
+                                         host_sdk_prefix,
+                                         call_selected_meson,
+                                         default_library,
+                                         builddir)
+
     meson_options += [f"--native-file={build_config.machine_file}"]
     if host_config is not build_config:
         meson_options += [f"--cross-file={host_config.machine_file}"]
 
-    process = call_selected_meson(["setup"] + meson_options + extra_meson_options + [builddir],
-                                  cwd=sourcedir,
-                                  env=host_config.make_merged_environment(os.environ))
+    call_selected_meson(["setup"] + meson_options + extra_meson_options + [builddir],
+                        cwd=sourcedir,
+                        env=host_config.make_merged_environment(environ),
+                        check=True)
 
     makefile_path = builddir / "Makefile"
     if not makefile_path.exists():
@@ -237,26 +243,6 @@ def configure(sourcedir: Path,
         "host": host_config if host_config is not build_config else None,
         "deps": deps_dir,
     }))
-
-    return process.returncode
-
-
-def print_toolchain_not_found_error(e: deps.BundleNotFoundError):
-    print(f"Unable to download toolchain: {e}", file=sys.stderr)
-    print(f"Specify --without-prebuilds=toolchain to only use tools on your PATH.", file=sys.stderr)
-
-
-def print_toolchain_unknown_error(e: Exception):
-    print(f"Unable to prepare toolchain: {e}", file=sys.stderr)
-
-
-def print_sdk_not_found_error(e: deps.BundleNotFoundError):
-    print(f"Unable to download SDK: {e}", file=sys.stderr)
-    print(f"Specify --without-prebuilds=sdk[:{{build|host}}] to build dependencies from source code.", file=sys.stderr)
-
-
-def print_sdk_unknown_error(e: Exception):
-    print(f"Unable to prepare SDK: {e}", file=sys.stderr)
 
 
 def parse_prefix(raw_prefix: str) -> Path:
@@ -465,3 +451,11 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
     call_selected_meson(["install"],
                         cwd=vala_checkout / "build",
                         **run_kwargs)
+
+
+class ToolchainNotFoundError(Exception):
+    pass
+
+
+class SDKNotFoundError(Exception):
+    pass
