@@ -16,6 +16,7 @@ from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
 
 from . import deps, env
 from .machine_spec import MachineSpec
+from .progress import ProgressCallback, print_progress
 
 
 def main():
@@ -117,7 +118,8 @@ def configure(sourcedir: Path,
               allowed_prebuilds: Sequence[str] = None,
               meson: str = "internal",
               extra_meson_options: List[str] = [],
-              call_meson: Callable = env.call_meson):
+              call_meson: Callable = env.call_meson,
+              on_progress: ProgressCallback = print_progress):
     if prefix is None:
         prefix = env.detect_default_prefix()
 
@@ -155,7 +157,7 @@ def configure(sourcedir: Path,
     allow_prebuilt_toolchain = "toolchain" in allowed_prebuilds
     if allow_prebuilt_toolchain:
         try:
-            toolchain_prefix, _ = deps.ensure_toolchain(build_machine, deps_dir)
+            toolchain_prefix, _ = deps.ensure_toolchain(build_machine, deps_dir, on_progress=on_progress)
         except deps.BundleNotFoundError as e:
             raise ToolchainNotFoundError("\n".join([
                 f"Unable to download toolchain: {e}",
@@ -183,7 +185,7 @@ def configure(sourcedir: Path,
         required.add("sdk:host")
     if allowed_prebuilds.issuperset(required):
         try:
-            build_sdk_prefix, _ = deps.ensure_sdk(build_machine, deps_dir)
+            build_sdk_prefix, _ = deps.ensure_sdk(build_machine, deps_dir, on_progress=on_progress)
         except deps.BundleNotFoundError as e:
             raise SDKNotFoundError("\n".join([
                 f"Unable to download SDK: {e}",
@@ -193,7 +195,7 @@ def configure(sourcedir: Path,
     host_sdk_prefix = None
     if is_cross_build and "sdk:host" in allowed_prebuilds:
         try:
-            host_sdk_prefix, _ = deps.ensure_sdk(host_machine, deps_dir)
+            host_sdk_prefix, _ = deps.ensure_sdk(host_machine, deps_dir, on_progress=on_progress)
         except deps.BundleNotFoundError as e:
             raise SDKNotFoundError("\n".join([
                 f"Unable to download SDK: {e}",
