@@ -5,7 +5,7 @@ import pickle
 import shlex
 import shutil
 import sys
-from typing import List
+from typing import Callable, List
 
 from . import env
 from .meson_configure import configure
@@ -32,22 +32,26 @@ def main():
     if isinstance(targets, str):
         targets = [targets]
 
-    exit_status = make(sourcedir, builddir, targets)
+    try:
+        make(sourcedir, builddir, targets)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
-    sys.exit(exit_status)
 
-
-def make(sourcedir: Path, builddir: Path, targets: List[str]):
+def make(sourcedir: Path,
+         builddir: Path,
+         targets: List[str],
+         environ: dict[str, str] = os.environ,
+         call_meson: Callable = env.call_meson):
     if not (builddir / "build.ninja").exists():
-        exit_status = configure(sourcedir, builddir)
-        if exit_status != 0:
-            return exit_status
+        configure(sourcedir, builddir, environ=environ)
 
     compile_options = []
-    if os.environ.get("V", None) == "1":
+    if environ.get("V") == "1":
         compile_options += ["-v"]
 
-    test_options = shlex.split(os.environ.get("FRIDA_TEST_OPTIONS", "-v"))
+    test_options = shlex.split(environ.get("FRIDA_TEST_OPTIONS", "-v"))
 
     standard_targets = {
         "all": ["compile"] + compile_options,
@@ -62,16 +66,16 @@ def make(sourcedir: Path, builddir: Path, targets: List[str]):
     machine_config = env_state["host"]
     if machine_config is None:
         machine_config = env_state["build"]
-    meson_env = machine_config.make_merged_environment(os.environ)
+    meson_env = machine_config.make_merged_environment(environ)
     meson_env["FRIDA_DEPS"] = str(env_state["deps"])
 
     def do_meson_command(args):
-        return env.call_meson(args,
-                              use_submodule=env_state["meson"] == "internal",
-                              cwd=builddir,
-                              env=meson_env).returncode
+        call_meson(args,
+                   use_submodule=env_state["meson"] == "internal",
+                   cwd=builddir,
+                   env=meson_env,
+                   check=True)
 
-    exit_status = 0
     pending_targets = targets.copy()
     pending_compile = None
 
@@ -96,22 +100,16 @@ def make(sourcedir: Path, builddir: Path, targets: List[str]):
             continue
 
         if pending_compile is not None:
-            exit_status = do_meson_command(pending_compile)
+            do_meson_command(pending_compile)
             pending_compile = None
-            if exit_status != 0:
-                break
 
         if meson_command is not None:
-            exit_status = do_meson_command(action)
-            if exit_status != 0:
-                break
+            do_meson_command(action)
         else:
             action()
 
-    if exit_status == 0 and pending_compile is not None:
-        exit_status = do_meson_command(pending_compile)
-
-    return exit_status
+    if pending_compile is not None:
+        do_meson_command(pending_compile)
 
 
 def distclean(sourcedir: Path, builddir: Path):
