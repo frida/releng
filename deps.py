@@ -31,6 +31,7 @@ sys.path.insert(0, str(RELENG_DIR / "tomlkit"))
 from tomlkit.toml_file import TOMLFile
 
 from releng import env
+from releng.progress import Progress, ProgressCallback, print_progress
 from releng.machine_spec import MachineSpec
 
 
@@ -110,10 +111,6 @@ def query_toolchain_prefix(machine: MachineSpec,
     identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
             else machine.identifier
     return cache_dir / f"toolchain-{identifier}"
-
-
-def print_progress(progress: Progress):
-    print(f"{progress.message}...", flush=True)
 
 
 def ensure_toolchain(machine: MachineSpec,
@@ -1018,14 +1015,6 @@ class BundleNotFoundError(Exception):
 class SourceState(Enum):
     PRISTINE = 1,
     MODIFIED = 2,
-
-
-@dataclass
-class Progress:
-    message: str
-
-
-ProgressCallback = Callable[[Progress], None]
 
 
 @dataclass
