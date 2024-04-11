@@ -112,11 +112,16 @@ def query_toolchain_prefix(machine: MachineSpec,
     return cache_dir / f"toolchain-{identifier}"
 
 
+def print_progress(progress: Progress):
+    print(f"{progress.message}...", flush=True)
+
+
 def ensure_toolchain(machine: MachineSpec,
                      cache_dir: Path,
-                     version: Optional[str] = None) -> tuple[Path, SourceState]:
+                     version: Optional[str] = None,
+                     on_progress: ProgressCallback = print_progress) -> tuple[Path, SourceState]:
     toolchain_prefix = query_toolchain_prefix(machine, cache_dir)
-    state = sync(Bundle.TOOLCHAIN, machine, toolchain_prefix, version)
+    state = sync(Bundle.TOOLCHAIN, machine, toolchain_prefix, version, on_progress)
     return (toolchain_prefix, state)
 
 
@@ -127,9 +132,10 @@ def query_sdk_prefix(machine: MachineSpec,
 
 def ensure_sdk(machine: MachineSpec,
                cache_dir: Path,
-               version: Optional[str] = None) -> tuple[Path, SourceState]:
+               version: Optional[str] = None,
+               on_progress: ProgressCallback = print_progress) -> tuple[Path, SourceState]:
     sdk_prefix = query_sdk_prefix(machine, cache_dir)
-    state = sync(Bundle.SDK, machine, sdk_prefix, version)
+    state = sync(Bundle.SDK, machine, sdk_prefix, version, on_progress)
     return (sdk_prefix, state)
 
 
@@ -145,7 +151,8 @@ def detect_cache_dir(sourcedir: Path) -> Path:
 def sync(bundle: Bundle,
          machine: MachineSpec,
          location: Path,
-         version: Optional[str] = None) -> SourceState:
+         version: Optional[str] = None,
+         on_progress: ProgressCallback = print_progress) -> SourceState:
     state = SourceState.PRISTINE
 
     if version is None:
@@ -168,14 +175,14 @@ def sync(bundle: Bundle,
     local_bundle = location.parent / filename
     archive_compression = "xz"
     if local_bundle.exists():
-        print("Deploying local {}...".format(bundle_nick), flush=True)
+        on_progress(Progress("Deploying local {}".format(bundle_nick)))
         archive_path = local_bundle
         archive_is_temporary = False
     else:
         if bundle == Bundle.SDK:
-            print(f"Downloading SDK {version} for {machine.identifier}...", flush=True)
+            on_progress(Progress(f"Downloading SDK {version} for {machine.identifier}"))
         else:
-            print(f"Downloading {bundle_nick} {version}...", flush=True)
+            on_progress(Progress(f"Downloading {bundle_nick} {version}"))
         try:
             try:
                 archive_path = fetch_bundle(url)
@@ -191,7 +198,7 @@ def sync(bundle: Bundle,
 
             archive_is_temporary = True
 
-            print(f"Extracting {bundle_nick}...", flush=True)
+            on_progress(Progress(f"Extracting {bundle_nick}"))
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise BundleNotFoundError(f"missing bundle at {url}") from e
@@ -1011,6 +1018,14 @@ class BundleNotFoundError(Exception):
 class SourceState(Enum):
     PRISTINE = 1,
     MODIFIED = 2,
+
+
+@dataclass
+class Progress:
+    message: str
+
+
+ProgressCallback = Callable[[Progress], None]
 
 
 @dataclass
