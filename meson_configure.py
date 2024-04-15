@@ -132,7 +132,7 @@ def configure(sourcedir: Path,
     if host_machine.os == "windows":
         vs_arch = environ.get("VSCMD_ARG_TGT_ARCH")
         if vs_arch == "x86":
-            host_machine = MachineSpec("windows", "x86", host_machine.config)
+            host_machine = host_machine.evolve(arch=vs_arch)
 
     build_machine = build_machine.maybe_adapt_to_host(host_machine)
 
