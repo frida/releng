@@ -149,7 +149,6 @@ def configure(sourcedir: Path,
         f"-Ddefault_library={default_library}",
         "-Doptimization=s",
         "-Db_ndebug=true",
-        "-Db_vscrt=mt",
     ]
 
     deps_dir = deps.detect_cache_dir(sourcedir)
