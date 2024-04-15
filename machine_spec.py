@@ -76,6 +76,7 @@ class MachineSpec:
     os: str
     arch: str
     config: Optional[str] = None
+    vscrt: Optional[str] = None
     triplet: Optional[str] = None
 
     @staticmethod
@@ -85,8 +86,13 @@ class MachineSpec:
 
     @staticmethod
     def parse(raw_spec: str) -> MachineSpec:
-        tokens = raw_spec.split("-")
+        os = None
+        arch = None
+        config = None
+        vscrt = None
+        triplet = None
 
+        tokens = raw_spec.split("-")
         if len(tokens) in {3, 4}:
             arch = tokens[0]
             m = TARGET_TRIPLET_ARCH_PATTERN.match(arch)
@@ -111,23 +117,24 @@ class MachineSpec:
                 elif arch == "aarch64":
                     arch = "arm64"
 
-                config = None
                 if system.startswith("musl"):
                     config = "musl"
                 elif kernel == "w64":
                     config = "mingw"
 
-                return MachineSpec(os, arch, config, raw_spec)
+                triplet = raw_spec
 
-        os, arch, *rest = tokens
-        if len(rest) != 0:
-            config = rest[0].lower()
-        else:
-            if os == "windows":
+        if os is None:
+            os, arch, *rest = tokens
+            if rest:
+                assert len(rest) <= 2
+                config = rest[0]
+                if len(rest) > 1:
+                    vscrt = rest[1]
+            elif os == "windows":
                 config = "release"
-            else:
-                config = None
-        return MachineSpec(os, arch, config)
+
+        return MachineSpec(os, arch, config, vscrt, triplet)
 
     @property
     def identifier(self) -> str:
