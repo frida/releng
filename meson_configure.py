@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import pickle
 import platform
+import re
 import shlex
 import shutil
 import subprocess
@@ -123,11 +124,17 @@ def configure(sourcedir: Path,
     if prefix is None:
         prefix = env.detect_default_prefix()
 
+    project_vscrt = detect_project_vscrt(sourcedir)
+
     if build_machine is None:
         build_machine = MachineSpec.make_from_local_system()
+    if build_machine.vscrt is None:
+        build_machine = build_machine.evolve(vscrt=project_vscrt)
 
     if host_machine is None:
         host_machine = build_machine
+    if host_machine.vscrt is None:
+        host_machine = host_machine.evolve(vscrt=project_vscrt)
 
     if host_machine.os == "windows":
         vs_arch = environ.get("VSCMD_ARG_TGT_ARCH")
@@ -416,8 +423,22 @@ def parse_array_option_value(v: str, opt: UserArrayOption) -> List[str]:
     return vals
 
 
+def detect_project_vscrt(sourcedir: Path) -> str:
+    m = next(re.finditer(r"project\(([^)]+\))", read_meson_build(sourcedir)), None)
+    if m is not None:
+        project_args = m.group(1)
+        m = next(re.finditer("'b_vscrt=([^']+)'", project_args), None)
+        if m is not None:
+            return m.group(1)
+    return "mt"
+
+
 def project_depends_on_vala_compiler(sourcedir: Path) -> bool:
-    return "'vala'" in (sourcedir / "meson.build").read_text(encoding="utf-8")
+    return "'vala'" in read_meson_build(sourcedir)
+
+
+def read_meson_build(sourcedir: Path) -> str:
+    return (sourcedir / "meson.build").read_text(encoding="utf-8")
 
 
 def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_meson: Callable):
