@@ -155,6 +155,8 @@ class MachineSpec:
         parts = [self.os, self.arch]
         if self.config is not None:
             parts += [self.config]
+        if self.vscrt is not None and self.toolchain_is_msvc:
+            parts += [self.vscrt]
         return "-".join(parts)
 
     @property
@@ -230,9 +232,12 @@ class MachineSpec:
         return "libdata" if self.os == "freebsd" else "lib"
 
     @property
+    def toolchain_is_msvc(self) -> bool:
+        return self.os == "windows" and self.config != "mingw"
+
+    @property
     def toolchain_can_strip(self) -> bool:
-        is_msvc = self.os == "windows" and self.config != "mingw"
-        return not is_msvc
+        return not self.toolchain_is_msvc
 
     def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
         if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
