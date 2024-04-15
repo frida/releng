@@ -136,6 +136,20 @@ class MachineSpec:
 
         return MachineSpec(os, arch, config, vscrt, triplet)
 
+    def evolve(self,
+               os: Optional[str] = None,
+               arch: Optional[str] = None,
+               config: Optional[str] = None,
+               vscrt: Optional[str] = None,
+               triplet: Optional[str] = None) -> MachineSpec:
+        return MachineSpec(
+            os if os is not None else self.os,
+            arch if arch is not None else self.arch,
+            config if config is not None else self.config,
+            vscrt if vscrt is not None else self.vscrt,
+            triplet if triplet is not None else self.triplet,
+        )
+
     @property
     def identifier(self) -> str:
         parts = [self.os, self.arch]
