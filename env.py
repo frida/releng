@@ -151,6 +151,9 @@ def generate_machine_config(machine: MachineSpec,
                              outenv,
                              outdir)
 
+    if machine.vscrt is not None:
+        builtin_options["b_vscrt"] = str_to_meson(machine.vscrt)
+
     if toolchain_prefix is not None:
         toolchain_bindir = toolchain_prefix / "bin"
         exe_suffix = build_machine.executable_suffix
