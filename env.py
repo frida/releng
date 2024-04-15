@@ -126,6 +126,7 @@ def generate_machine_config(machine: MachineSpec,
     ])
 
     binaries = config["binaries"]
+    builtin_options = config["built-in options"]
     properties = config["properties"]
 
     outpath = []
@@ -199,13 +200,13 @@ def generate_machine_config(machine: MachineSpec,
             ])
 
         if sdk_prefix is not None:
-            config["built-in options"]["vala_args"] = strv_to_meson([
+            builtin_options["vala_args"] = strv_to_meson([
                 "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
             ])
 
     if sdk_prefix is not None:
         pkg_config_path = [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
-        config["built-in options"]["pkg_config_path"] = strv_to_meson(pkg_config_path)
+        builtin_options["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
     needs_wrapper = needs_exe_wrapper(build_machine, machine, environ)
     properties["needs_exe_wrapper"] = bool_to_meson(needs_wrapper)
