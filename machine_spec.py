@@ -80,9 +80,8 @@ class MachineSpec:
 
     @staticmethod
     def make_from_local_system() -> MachineSpec:
-        bos = detect_os()
-        config = "release" if bos == "windows" else None
-        return MachineSpec(bos, detect_arch(), config)
+        os = detect_os()
+        return MachineSpec(os, detect_arch(), config="release" if os == "windows" else None)
 
     @staticmethod
     def parse(raw_spec: str) -> MachineSpec:
@@ -226,10 +225,10 @@ class MachineSpec:
 
 
 def detect_os() -> str:
-    bos = platform.system().lower()
-    if bos == "darwin":
-        bos = "macos"
-    return bos
+    os = platform.system().lower()
+    if os == "darwin":
+        os = "macos"
+    return os
 
 
 def detect_arch() -> str:
