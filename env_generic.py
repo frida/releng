@@ -116,11 +116,13 @@ def init_machine_config(machine: MachineSpec,
 
     if cc is None:
         if machine.os == "windows":
-            cc = [str(winenv.detect_msvs_tool_path(machine, "cl.exe", toolchain_prefix))]
-            lib = [str(winenv.detect_msvs_tool_path(machine, "lib.exe", toolchain_prefix))]
-            link = [str(winenv.detect_msvs_tool_path(machine, "link.exe", toolchain_prefix))]
+            detect_tool_path = lambda name: winenv.detect_msvs_tool_path(machine, build_machine, name, toolchain_prefix)
+
+            cc = [str(detect_tool_path("cl.exe"))]
+            lib = [str(detect_tool_path("lib.exe"))]
+            link = [str(detect_tool_path("link.exe"))]
             assembler_name = MSVC_ASSEMBLER_NAMES[machine.arch]
-            assembler_tool = [str(winenv.detect_msvs_tool_path(machine, assembler_name + ".exe", toolchain_prefix))]
+            assembler_tool = [str(detect_tool_path(assembler_name + ".exe"))]
 
             raw_cc = strv_to_meson(cc) + " + common_flags"
             binaries["c"] = raw_cc

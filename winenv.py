@@ -73,9 +73,11 @@ def detect_windows_sdk() -> tuple[Path, str]:
 
 
 def detect_msvs_tool_path(machine: MachineSpec,
+                          build_machine: MachineSpec,
                           tool: str,
                           toolchain_prefix: Optional[Path]) -> Path:
-    return detect_msvc_tool_dir(toolchain_prefix) / "bin" / "HostX86" / machine.msvc_platform / tool
+    return detect_msvc_tool_dir(toolchain_prefix) / "bin" / f"Host{build_machine.msvc_platform}" \
+            / machine.msvc_platform / tool
 
 
 def detect_msvs_runtime_path(machine: MachineSpec,
