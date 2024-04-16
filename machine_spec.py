@@ -150,6 +150,11 @@ class MachineSpec:
             triplet if triplet is not None else self.triplet,
         )
 
+    def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
+        if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
+            return host_machine
+        return self
+
     @property
     def identifier(self) -> str:
         parts = [self.os, self.arch]
@@ -238,11 +243,6 @@ class MachineSpec:
     @property
     def toolchain_can_strip(self) -> bool:
         return not self.toolchain_is_msvc
-
-    def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
-        if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
-            return host_machine
-        return self
 
     def __eq__(self, other):
         if isinstance(other, MachineSpec):
