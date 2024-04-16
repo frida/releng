@@ -85,11 +85,11 @@ def detect_msvs_runtime_path(machine: MachineSpec,
     native_msvc_platform = build_machine.msvc_platform
 
     msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
-    msvc_bindir = msvc_dir / "bin" / ("Host" + native_msvc_platform) / msvc_platform
+    msvc_bindir = msvc_dir / "bin" / f"Host{native_msvc_platform}" / msvc_platform
 
     msvc_dll_dirs = []
     if msvc_platform != native_msvc_platform:
-        msvc_dll_dirs.append(msvc_dir / "bin" / ("Host" + native_msvc_platform) / native_msvc_platform)
+        msvc_dll_dirs.append(msvc_dir / "bin" / f"Host{native_msvc_platform}" / native_msvc_platform)
 
     (winsdk_dir, winsdk_version) = detect_windows_sdk()
     winsdk_bindir = winsdk_dir / "Bin" / winsdk_version / msvc_platform
