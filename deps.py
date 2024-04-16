@@ -9,7 +9,7 @@ import graphlib
 import itertools
 import json
 import os
-from pathlib import Path, PurePath
+from pathlib import Path
 import shlex
 import shutil
 import subprocess
@@ -17,7 +17,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from typing import Callable, Optional, Mapping, Sequence, Union
+from typing import Callable, Iterator, Optional, Mapping, Sequence, Union
 import urllib.request
 
 RELENG_DIR = Path(__file__).parent.resolve()
@@ -627,61 +627,55 @@ class Builder:
 
     def _stage_toolchain_files(self, location: Path) -> list[Path]:
         if self._host_machine.os == "windows":
-            mixin_files = []
-            for dirpath, dirnames, filenames in os.walk(self._toolchain_prefix):
-                relpath = PurePath(dirpath).relative_to(self._toolchain_prefix)
-                all_files = [relpath / f for f in filenames]
-                mixin_files += [f for f in all_files if not (self._file_is_vala_toolchain_related(f) or \
-                        f.parent.name == "manifest")]
-            copy_files(self._toolchain_prefix, mixin_files, location)
+            toolchain_prefix = self._toolchain_prefix
+            mixin_files = [f for f in self._walk_plain_files(toolchain_prefix)
+                           if self._file_should_be_mixed_into_toolchain(f)]
+            copy_files(toolchain_prefix, mixin_files, location)
 
-        files = []
         prefix = self._get_prefix(self._host_machine)
-        for dirpath, dirnames, filenames in os.walk(prefix):
-            relpath = PurePath(dirpath).relative_to(prefix)
-            all_files = [relpath / f for f in filenames]
-            files += [f for f in all_files \
-                      if self._file_is_vala_toolchain_related(f) \
-                          or (f.parts[0] == "bin" \
-                              and f.stem not in {"gdbus", "gio", "gobject-query", "gsettings"} \
-                              and not f.stem.startswith("gspawn-") \
-                              and f.suffix != ".pdb") \
-                          or f.parts[0] == "manifest"]
+        files = [f for f in self._walk_plain_files(prefix)
+                 if self._file_is_toolchain_related(f)]
         copy_files(prefix, files, location)
 
     def _stage_sdk_files(self, location: Path) -> list[Path]:
-        files = []
         prefix = self._get_prefix(self._host_machine)
-        for dirpath, dirnames, filenames in os.walk(prefix):
-            relpath = PurePath(dirpath).relative_to(prefix)
-            all_files = [relpath / f for f in filenames]
-            files += [f for f in all_files if self._file_is_sdk_related(f)]
+        files = [f for f in self._walk_plain_files(prefix)
+                 if self._file_is_sdk_related(f)]
         copy_files(prefix, files, location)
 
     def _adjust_files_containing_hardcoded_paths(self, bundledir: Path):
-        raw_prefix = str(self._get_prefix(self._host_machine))
-        for raw_dirpath, dirnames, filenames in os.walk(bundledir):
-            dirpath = Path(raw_dirpath)
+        prefix = self._get_prefix(self._host_machine)
+
+        raw_prefixes = [str(prefix)]
+        if self._host_machine.os == "windows":
+            raw_prefixes.append(prefix.as_posix())
+
+        for f in self._walk_plain_files(bundledir):
+            filepath = bundledir / f
+            try:
+                text = filepath.read_text(encoding="utf-8")
+
+                new_text = text
+                is_pcfile = filepath.suffix == ".pc"
+                replacement = "${frida_sdk_prefix}" if is_pcfile else "@FRIDA_TOOLROOT@"
+                for p in raw_prefixes:
+                    new_text = new_text.replace(p, replacement)
+
+                if new_text != text:
+                    filepath.write_text(new_text, encoding="utf-8")
+                    if not is_pcfile:
+                        filepath.rename(filepath.parent / f"{f.name}.frida.in")
+            except UnicodeDecodeError:
+                pass
+
+    @staticmethod
+    def _walk_plain_files(rootdir: Path) -> Iterator[Path]:
+        for dirpath, dirnames, filenames in os.walk(rootdir):
             for filename in filenames:
-                filepath = dirpath / filename
-
-                if filepath.is_symlink():
+                f = Path(dirpath) / filename
+                if f.is_symlink():
                     continue
-
-                try:
-                    text = filepath.read_text(encoding="utf-8")
-
-                    new_text = text
-                    is_pcfile = filepath.suffix == ".pc"
-                    replacement = "${frida_sdk_prefix}" if is_pcfile else "@FRIDA_TOOLROOT@"
-                    new_text = new_text.replace(raw_prefix, replacement)
-
-                    if new_text != text:
-                        filepath.write_text(new_text, encoding="utf-8")
-                        if not is_pcfile:
-                            filepath.rename(dirpath / f"{filename}.frida.in")
-                except UnicodeDecodeError:
-                    pass
+                yield f.relative_to(rootdir)
 
     @staticmethod
     def _adjust_manifests(bundledir: Path):
@@ -699,22 +693,65 @@ class Builder:
             else:
                 manifest_path.unlink()
 
-    def _file_is_vala_toolchain_related(self, candidate: PurePath) -> bool:
-        if candidate.suffix in {".vapi", ".deps"}:
-            return True
-        return candidate.name.startswith("valac-") and candidate.suffix == self._host_machine.executable_suffix
+    def _file_should_be_mixed_into_toolchain(self, f: Path) -> bool:
+        parts = f.parts
+        if parts[0] == "VERSION.txt":
+            return False
+        if parts[0] == "bin":
+            stem = f.stem
+            # TODO: Remove on next bootstrap bump
+            if stem == "7z":
+                return False
+            return stem in {"bison", "flex", "m4", "nasm", "vswhere"} or stem.startswith("msys-")
+        if parts[0] == "manifest":
+            return False
 
-    def _file_is_sdk_related(self, candidate: PurePath) -> bool:
-        suffix = candidate.suffix
+        if self._file_is_vala_toolchain_related(f):
+            return False
+
+        return True
+
+    def _file_is_toolchain_related(self, f: Path) -> bool:
+        if self._file_is_vala_toolchain_related(f):
+            return True
+
+        parts = f.parts
+        if parts[0] == "bin":
+            if f.suffix == ".pdb":
+                return False
+            stem = f.stem
+            if stem in {"gdbus", "gio", "gobject-query", "gsettings"}:
+                return False
+            if stem.startswith("gspawn-"):
+                return False
+            return True
+        if parts[0] == "manifest":
+            return True
+
+        return False
+
+    def _file_is_vala_toolchain_related(self, f: Path) -> bool:
+        if f.suffix in {".vapi", ".deps"}:
+            return True
+
+        name = f.name
+        if f.suffix == self._host_machine.executable_suffix:
+            return name.startswith("vala") or name.startswith("vapi") or name.startswith("gen-introspect")
+        if f.parts[0] == "bin" and name.startswith("vala-gen-introspect"):
+            return True
+
+        return False
+
+    def _file_is_sdk_related(self, f: Path) -> bool:
+        suffix = f.suffix
         if suffix == ".pdb":
             return False
         if suffix in [".vapi", ".deps"]:
             return True
 
-        parts = candidate.parts
-
-        if parts[1] == "bin":
-            return candidate.name.startswith("v8-mksnapshot-")
+        parts = f.parts
+        if parts[0] == "bin":
+            return f.name.startswith("v8-mksnapshot-")
 
         return "share" not in parts
 
@@ -909,7 +946,7 @@ def parse_dependency(v: Union[str, dict]) -> OptionSpec:
 
 
 def copy_files(fromdir: Path,
-               files: list[PurePath],
+               files: list[Path],
                todir: Path):
     for filename in files:
         src = fromdir / filename
