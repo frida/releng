@@ -128,13 +128,12 @@ def configure(sourcedir: Path,
 
     if build_machine is None:
         build_machine = MachineSpec.make_from_local_system()
-    if build_machine.vscrt is None:
-        build_machine = build_machine.evolve(vscrt=project_vscrt)
+    build_machine = build_machine.default_missing(vscrt=project_vscrt)
 
     if host_machine is None:
         host_machine = build_machine
-    if host_machine.vscrt is None:
-        host_machine = host_machine.evolve(vscrt=project_vscrt)
+    else:
+        host_machine = host_machine.default_missing(vscrt=project_vscrt)
 
     if host_machine.os == "windows":
         vs_arch = environ.get("VSCMD_ARG_TGT_ARCH")
@@ -423,14 +422,14 @@ def parse_array_option_value(v: str, opt: UserArrayOption) -> List[str]:
     return vals
 
 
-def detect_project_vscrt(sourcedir: Path) -> str:
+def detect_project_vscrt(sourcedir: Path) -> Optional[str]:
     m = next(re.finditer(r"project\(([^)]+\))", read_meson_build(sourcedir)), None)
     if m is not None:
         project_args = m.group(1)
         m = next(re.finditer("'b_vscrt=([^']+)'", project_args), None)
         if m is not None:
             return m.group(1)
-    return "mt"
+    return None
 
 
 def project_depends_on_vala_compiler(sourcedir: Path) -> bool:
