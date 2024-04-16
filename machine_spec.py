@@ -81,8 +81,7 @@ class MachineSpec:
 
     @staticmethod
     def make_from_local_system() -> MachineSpec:
-        os = detect_os()
-        return MachineSpec(os, detect_arch(), config="release" if os == "windows" else None)
+        return MachineSpec(detect_os(), detect_arch())
 
     @staticmethod
     def parse(raw_spec: str) -> MachineSpec:
@@ -131,8 +130,6 @@ class MachineSpec:
                 config = rest[0]
                 if len(rest) > 1:
                     vscrt = rest[1]
-            elif os == "windows":
-                config = "release"
 
         return MachineSpec(os, arch, config, vscrt, triplet)
 
