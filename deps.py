@@ -315,10 +315,6 @@ class Builder:
                 .maybe_adapt_to_host(self._host_machine)
         self._verbose = verbose
         self._default_library = "static"
-        runtimes = ["static"]
-        if host_machine.os == "windows" and bundle is Bundle.SDK:
-            runtimes += ["dynamic"]
-        self._runtimes = runtimes
 
         self._params = load_dependency_parameters()
         self._cachedir = detect_cache_dir(ROOT_DIR)
@@ -533,25 +529,22 @@ class Builder:
 
     def _build_package(self, pkg: PackageSpec, machines: Sequence[MachineSpec]):
         for machine in machines:
-            for runtime in self._runtimes:
-                manifest_path = self._get_manifest_path(pkg, machine, runtime)
-                action = "skip" if manifest_path.exists() else "build"
+            manifest_path = self._get_manifest_path(pkg, machine)
+            action = "skip" if manifest_path.exists() else "build"
 
-                message = "Building" if action == "build" else "Already built"
-                message += f" for {machine.identifier}"
-                if len(self._runtimes) > 1:
-                    message += f" [{runtime} CRT]"
-                self._print_status(pkg.name, message)
+            message = "Building" if action == "build" else "Already built"
+            message += f" for {machine.identifier}"
+            self._print_status(pkg.name, message)
 
-                if action == "build":
-                    self._build_package_for_machine(pkg, machine, runtime)
-                    assert manifest_path.exists()
+            if action == "build":
+                self._build_package_for_machine(pkg, machine)
+                assert manifest_path.exists()
 
-    def _build_package_for_machine(self, pkg: PackageSpec, machine: MachineSpec, runtime: str):
+    def _build_package_for_machine(self, pkg: PackageSpec, machine: MachineSpec):
         sourcedir = self._get_sourcedir(pkg)
-        builddir = self._get_builddir(pkg, machine, runtime)
+        builddir = self._get_builddir(pkg, machine)
 
-        prefix = self._get_prefix(machine, runtime)
+        prefix = self._get_prefix(machine)
         libdir = prefix / "lib"
         if machine.config != "debug":
             optimization = "s"
@@ -569,7 +562,7 @@ class Builder:
         pc_opts = [f"-Dpkg_config_path={prefix / machine.libdatadir / 'pkgconfig'}"]
         if self._host_config is not self._build_config and machine is self._host_machine:
             machine_file_opts += [f"--cross-file={self._host_config.machine_file}"]
-            pc_path_for_build = self._get_prefix(self._build_machine, runtime) / self._build_machine.libdatadir / "pkgconfig"
+            pc_path_for_build = self._get_prefix(self._build_machine) / self._build_machine.libdatadir / "pkgconfig"
             pc_opts += [f"-Dbuild.pkg_config_path={pc_path_for_build}"]
 
         menv = self._host_env if machine is self._host_machine else self._build_env
@@ -594,7 +587,6 @@ class Builder:
                              f"-Doptimization={optimization}",
                              f"-Db_ndebug={ndebug}",
                              f"-Dstrip={strip}",
-                             f"-Db_vscrt={vscrt_from_configuration_and_runtime(machine.config, runtime)}",
                              *[opt.value for opt in pkg.options],
                          ],
                          cwd=sourcedir,
@@ -613,7 +605,7 @@ class Builder:
         for installed_path in install_locations.values():
             manifest_lines.append(Path(installed_path).relative_to(prefix).as_posix())
         manifest_lines.sort()
-        manifest_path = self._get_manifest_path(pkg, machine, runtime)
+        manifest_path = self._get_manifest_path(pkg, machine)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
@@ -668,7 +660,7 @@ class Builder:
             copy_files(self._toolchain_prefix, mixin_files, location)
 
         files = []
-        prefix = self._get_prefix(self._host_machine, "static")
+        prefix = self._get_prefix(self._host_machine)
         for dirpath, dirnames, filenames in os.walk(prefix):
             relpath = PurePath(dirpath).relative_to(prefix)
             all_files = [relpath / f for f in filenames]
@@ -683,19 +675,15 @@ class Builder:
 
     def _stage_sdk_files(self, location: Path) -> list[Path]:
         files = []
-        outdir = self._get_outdir()
-        for runtime in self._runtimes:
-            prefix = self._get_prefix(self._host_machine, "static")
-            for dirpath, dirnames, filenames in os.walk(prefix):
-                relpath = PurePath(dirpath).relative_to(outdir)
-                all_files = [relpath / f for f in filenames]
-                files += [f for f in all_files if self._file_is_sdk_related(f)]
-            files += [f.relative_to(outdir) for f in \
-                    (prefix.parent / (prefix.name[:-7] + "-dynamic") / "lib").glob("**/*.a")]
-        copy_files(outdir, files, location, self._transform_sdk_dest)
+        prefix = self._get_prefix(self._host_machine)
+        for dirpath, dirnames, filenames in os.walk(prefix):
+            relpath = PurePath(dirpath).relative_to(prefix)
+            all_files = [relpath / f for f in filenames]
+            files += [f for f in all_files if self._file_is_sdk_related(f)]
+        copy_files(prefix, files, location)
 
     def _adjust_files_containing_hardcoded_paths(self, bundledir: Path):
-        prefixes = [str(self._get_prefix(self._host_machine, runtime)) for runtime in self._runtimes]
+        raw_prefix = str(self._get_prefix(self._host_machine))
         for raw_dirpath, dirnames, filenames in os.walk(bundledir):
             dirpath = Path(raw_dirpath)
             for filename in filenames:
@@ -710,8 +698,7 @@ class Builder:
                     new_text = text
                     is_pcfile = filepath.suffix == ".pc"
                     replacement = "${frida_sdk_prefix}" if is_pcfile else "@FRIDA_TOOLROOT@"
-                    for prefix in prefixes:
-                        new_text = new_text.replace(prefix, replacement)
+                    new_text = new_text.replace(raw_prefix, replacement)
 
                     if new_text != text:
                         filepath.write_text(new_text, encoding="utf-8")
@@ -729,11 +716,6 @@ class Builder:
             for entry in manifest_path.read_text(encoding="utf-8").strip().split("\n"):
                 if prefix.joinpath(entry).exists():
                     lines.append(entry)
-
-                if entry.startswith("lib/") and entry.endswith(".a"):
-                    dynamic_entry = "lib-dynamic/" + entry[4:]
-                    if prefix.joinpath(dynamic_entry).exists():
-                        lines.append(dynamic_entry)
 
             if lines:
                 lines.sort()
@@ -758,22 +740,9 @@ class Builder:
         if parts[1] == "bin":
             if self._host_machine.config == "debug":
                 return False
-            if parts[0].endswith("-dynamic"):
-                return False
             return candidate.name.startswith("v8-mksnapshot-")
 
         return "share" not in parts
-
-    @staticmethod
-    def _transform_sdk_dest(srcfile: PurePath) -> PurePath:
-        parts = srcfile.parent.parts
-        rootdir = parts[0]
-        subpath = PurePath(*parts[1:])
-
-        if rootdir.endswith("-dynamic") and subpath.parts[0] == "lib":
-            subpath = PurePath("lib-dynamic").joinpath(*subpath.parts[1:])
-
-        return subpath / srcfile.name
 
     def _get_outdir(self) -> Path:
         return self._workdir / f"_{self._bundle.name.lower()}.out"
@@ -781,23 +750,17 @@ class Builder:
     def _get_sourcedir(self, pkg: PackageSpec) -> Path:
         return self._workdir / pkg.identifier
 
-    def _get_builddir(self, pkg: PackageSpec, machine: MachineSpec, runtime: str) -> Path:
-        return self._get_builddir_container() / self._compute_output_id(machine, runtime) / pkg.identifier
+    def _get_builddir(self, pkg: PackageSpec, machine: MachineSpec) -> Path:
+        return self._get_builddir_container() / machine.identifier / pkg.identifier
 
     def _get_builddir_container(self) -> Path:
         return self._workdir / f"_{self._bundle.name.lower()}.tmp"
 
-    def _get_prefix(self, machine: MachineSpec, runtime: str) -> Path:
-        return self._get_outdir() / self._compute_output_id(machine, runtime)
+    def _get_prefix(self, machine: MachineSpec) -> Path:
+        return self._get_outdir() / machine.identifier
 
-    def _compute_output_id(self, machine: MachineSpec, runtime: str) -> str:
-        parts = [machine.identifier]
-        if machine.os == "windows":
-            parts += [runtime]
-        return "-".join(parts)
-
-    def _get_manifest_path(self, pkg: PackageSpec, machine: MachineSpec, runtime: str) -> Path:
-        return self._get_prefix(machine, runtime) / "manifest" / f"{pkg.identifier}.pkg"
+    def _get_manifest_path(self, pkg: PackageSpec, machine: MachineSpec) -> Path:
+        return self._get_prefix(machine) / "manifest" / f"{pkg.identifier}.pkg"
 
     def _print_package_banner(self, pkg: PackageSpec):
         if self._ansi_supported:
@@ -852,13 +815,6 @@ class Builder:
             print(f"│ \033[1m{scope}\033[0m :: {status}", flush=True)
         else:
             print(f"# {scope} :: {status}", flush=True)
-
-
-def vscrt_from_configuration_and_runtime(config: str, runtime: str) -> str:
-    result = "md" if runtime == "dynamic" else "mt"
-    if config == "debug":
-        result += "d"
-    return result
 
 
 def wait(bundle: Bundle, machine: MachineSpec):
@@ -980,13 +936,11 @@ def parse_dependency(v: Union[str, dict]) -> OptionSpec:
 
 def copy_files(fromdir: Path,
                files: list[PurePath],
-               todir: Path,
-               transformdest: Callable[[PurePath], PurePath] = lambda x: x):
+               todir: Path):
     for filename in files:
         src = fromdir / filename
-        dst = todir / transformdest(filename)
-        dstdir = dst.parent
-        dstdir.mkdir(parents=True, exist_ok=True)
+        dst = todir / filename
+        dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(src, dst, follow_symlinks=False)
 
 
