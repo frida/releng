@@ -81,10 +81,10 @@ options = [
     "-Dxattr=false",
     "-Dlibmount=disabled",
     "-Dtests=false",
-    "-Dglib_debug=disabled",
-    "-Dglib_assert=false",
-    "-Dglib_checks=false",
     "--force-fallback-for=pcre",
+    { value = "-Dglib_debug=disabled", when = "machine.config_is_optimized" },
+    { value = "-Dglib_assert=false", when = "machine.config_is_optimized" },
+    { value = "-Dglib_checks=false", when = "machine.config_is_optimized" },
     { value = "-Diconv=external", when = """ \
                                          machine.is_apple \
                                          or machine.os in {'android', 'qnx'} \
@@ -212,7 +212,6 @@ name = "lwip"
 version = "0c1b36894deeece78eee522278c93483e92d5936"
 url = "https://github.com/frida/lwip.git"
 options = [
-    "-Dlwip_debug=disabled",
     "-Dipv4=disabled",
     "-Dipv6=enabled",
     "-Ddns=disabled",
@@ -221,6 +220,7 @@ options = [
     "-Dtcp_mss=1360",
     "-Dtcp_snd_buf=65535",
     "-Dtcp_wnd=65535",
+    { value = "-Dlwip_debug=disabled", when = "machine.config_is_optimized" },
 ]
 dependencies = [
     "glib",
