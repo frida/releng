@@ -150,6 +150,21 @@ class MachineSpec:
             triplet if triplet is not None else self.triplet,
         )
 
+    def default_missing(self, recommended_vscrt: Optional[str] = None) -> MachineSpec:
+        config = self.config
+        if config is None and self.os == "windows":
+            config = "release"
+
+        vscrt = self.vscrt
+        if vscrt is None and self.toolchain_is_msvc:
+            vscrt = recommended_vscrt
+            if vscrt is None:
+                vscrt = "mt"
+            if config == "debug" and vscrt in {"md", "mt"}:
+                vscrt += "d"
+
+        return self.evolve(config=config, vscrt=vscrt)
+
     def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
         if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
             return host_machine
