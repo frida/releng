@@ -170,7 +170,7 @@ def configure(sourcedir: Path,
     else:
         if project_depends_on_vala_compiler(sourcedir):
             toolchain_prefix = deps.query_toolchain_prefix(build_machine, deps_dir)
-            vala_compiler = deps.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
+            vala_compiler = env.detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
             if vala_compiler is None:
                 try:
                     build_vala_compiler(toolchain_prefix, deps_dir, call_selected_meson)
