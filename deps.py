@@ -170,7 +170,6 @@ def sync(bundle: Bundle,
     (url, filename) = compute_bundle_parameters(bundle, machine, version)
 
     local_bundle = location.parent / filename
-    archive_compression = "xz"
     if local_bundle.exists():
         on_progress(Progress("Deploying local {}".format(bundle_nick)))
         archive_path = local_bundle
@@ -181,20 +180,11 @@ def sync(bundle: Bundle,
         else:
             on_progress(Progress(f"Downloading {bundle_nick} {version}"))
         try:
-            try:
-                archive_path = fetch_bundle(url)
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
-                    archive_path = None
-                else:
-                    raise e
-
-            if archive_path is None:
-                archive_path = fetch_bundle(url.replace(".xz", ".bz2"))
-                archive_compression = "bz2"
-
-            archive_is_temporary = True
-
+            with urllib.request.urlopen(url) as response, \
+                    tempfile.NamedTemporaryFile(delete=False) as archive:
+                shutil.copyfileobj(response, archive)
+                archive_path = Path(archive.name)
+                archive_is_temporary = True
             on_progress(Progress(f"Extracting {bundle_nick}"))
         except urllib.error.HTTPError as e:
             if e.code == 404:
@@ -207,7 +197,7 @@ def sync(bundle: Bundle,
             shutil.rmtree(staging_dir)
         staging_dir.mkdir(parents=True)
 
-        with tarfile.open(archive_path, f"r:{archive_compression}") as tar:
+        with tarfile.open(archive_path, "r:xz") as tar:
             tar.extractall(staging_dir)
 
         suffix_len = len(".frida.in")
@@ -224,13 +214,6 @@ def sync(bundle: Bundle,
             archive_path.unlink()
 
     return state
-
-
-def fetch_bundle(url: str) -> Path:
-    with urllib.request.urlopen(url) as response, \
-            tempfile.NamedTemporaryFile(delete=False) as archive:
-        shutil.copyfileobj(response, archive)
-        return Path(archive.name)
 
 
 def roll(bundle: Bundle, machine: MachineSpec, activate: bool, post: Optional[Path]):
