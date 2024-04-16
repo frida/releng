@@ -529,7 +529,7 @@ class Builder:
 
         prefix = self._get_prefix(machine)
         libdir = prefix / "lib"
-        if machine.config != "debug":
+        if machine.config_is_optimized:
             optimization = "s"
             ndebug = "true"
         else:
@@ -721,8 +721,6 @@ class Builder:
         parts = candidate.parts
 
         if parts[1] == "bin":
-            if self._host_machine.config == "debug":
-                return False
             return candidate.name.startswith("v8-mksnapshot-")
 
         return "share" not in parts

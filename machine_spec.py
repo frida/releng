@@ -76,7 +76,6 @@ class MachineSpec:
     os: str
     arch: str
     config: Optional[str] = None
-    vscrt: Optional[str] = None
     triplet: Optional[str] = None
 
     @staticmethod
@@ -88,7 +87,6 @@ class MachineSpec:
         os = None
         arch = None
         config = None
-        vscrt = None
         triplet = None
 
         tokens = raw_spec.split("-")
@@ -126,41 +124,31 @@ class MachineSpec:
         if os is None:
             os, arch, *rest = tokens
             if rest:
-                assert len(rest) <= 2
+                assert len(rest) == 1
                 config = rest[0]
-                if len(rest) > 1:
-                    vscrt = rest[1]
 
-        return MachineSpec(os, arch, config, vscrt, triplet)
+        return MachineSpec(os, arch, config, triplet)
 
     def evolve(self,
                os: Optional[str] = None,
                arch: Optional[str] = None,
                config: Optional[str] = None,
-               vscrt: Optional[str] = None,
                triplet: Optional[str] = None) -> MachineSpec:
         return MachineSpec(
             os if os is not None else self.os,
             arch if arch is not None else self.arch,
             config if config is not None else self.config,
-            vscrt if vscrt is not None else self.vscrt,
             triplet if triplet is not None else self.triplet,
         )
 
     def default_missing(self, recommended_vscrt: Optional[str] = None) -> MachineSpec:
         config = self.config
-        if config is None and self.os == "windows":
-            config = "release"
-
-        vscrt = self.vscrt
-        if vscrt is None and self.toolchain_is_msvc:
-            vscrt = recommended_vscrt
-            if vscrt is None:
-                vscrt = "mt"
-            if config == "debug" and vscrt in {"md", "mt"}:
-                vscrt += "d"
-
-        return self.evolve(config=config, vscrt=vscrt)
+        if config is None and self.toolchain_is_msvc:
+            if recommended_vscrt is not None:
+                config = recommended_vscrt
+            else:
+                config = "mt"
+        return self.evolve(config=config)
 
     def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
         if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
@@ -172,8 +160,6 @@ class MachineSpec:
         parts = [self.os, self.arch]
         if self.config is not None:
             parts += [self.config]
-        if self.vscrt is not None and self.toolchain_is_msvc:
-            parts += [self.vscrt]
         return "-".join(parts)
 
     @property
@@ -186,6 +172,12 @@ class MachineSpec:
         if self.config is not None:
             parts += [self.config]
         return "-".join(parts)
+
+    @property
+    def config_is_optimized(self) -> bool:
+        if self.toolchain_is_msvc:
+            return self.config in {"md", "mt"}
+        return True
 
     @property
     def executable_suffix(self) -> str:

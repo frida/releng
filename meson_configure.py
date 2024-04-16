@@ -128,12 +128,12 @@ def configure(sourcedir: Path,
 
     if build_machine is None:
         build_machine = MachineSpec.make_from_local_system()
-    build_machine = build_machine.default_missing(vscrt=project_vscrt)
+    build_machine = build_machine.default_missing(recommended_vscrt=project_vscrt)
 
     if host_machine is None:
         host_machine = build_machine
     else:
-        host_machine = host_machine.default_missing(vscrt=project_vscrt)
+        host_machine = host_machine.default_missing(recommended_vscrt=project_vscrt)
 
     if host_machine.os == "windows":
         vs_arch = environ.get("VSCMD_ARG_TGT_ARCH")
