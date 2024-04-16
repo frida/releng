@@ -180,6 +180,19 @@ class MachineSpec:
         return True
 
     @property
+    def meson_optimization_options(self) -> list[str]:
+        if self.config_is_optimized:
+            optimization = "s"
+            ndebug = "true"
+        else:
+            optimization = "0"
+            ndebug = "false"
+        return [
+            f"-Doptimization={optimization}",
+            f"-Db_ndebug={ndebug}",
+        ]
+
+    @property
     def executable_suffix(self) -> str:
         return ".exe" if self.os == "windows" else ""
 

@@ -529,12 +529,6 @@ class Builder:
 
         prefix = self._get_prefix(machine)
         libdir = prefix / "lib"
-        if machine.config_is_optimized:
-            optimization = "s"
-            ndebug = "true"
-        else:
-            optimization = "0"
-            ndebug = "false"
 
         strip = "true" if machine.toolchain_can_strip else "false"
 
@@ -567,8 +561,7 @@ class Builder:
                              *pc_opts,
                              f"-Ddefault_library={self._default_library}",
                              f"-Dbackend=ninja",
-                             f"-Doptimization={optimization}",
-                             f"-Db_ndebug={ndebug}",
+                             *machine.meson_optimization_options,
                              f"-Dstrip={strip}",
                              *[opt.value for opt in pkg.options],
                          ],

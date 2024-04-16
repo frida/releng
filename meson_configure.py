@@ -153,8 +153,7 @@ def configure(sourcedir: Path,
     meson_options = [
         f"-Dprefix={prefix}",
         f"-Ddefault_library={default_library}",
-        "-Doptimization=s",
-        "-Db_ndebug=true",
+        *host_machine.meson_optimization_options,
     ]
 
     deps_dir = deps.detect_cache_dir(sourcedir)
