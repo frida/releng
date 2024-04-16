@@ -1,6 +1,6 @@
 [dependencies]
-version = "20240407"
-bootstrap_version = "20240319"
+version = "20240417"
+bootstrap_version = "20240407"
 
 [ninja]
 scope = "toolchain"
