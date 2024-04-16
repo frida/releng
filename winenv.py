@@ -81,8 +81,8 @@ def detect_msvs_tool_path(machine: MachineSpec,
 def detect_msvs_runtime_path(machine: MachineSpec,
                              build_machine: MachineSpec,
                              toolchain_prefix: Optional[Path]) -> list[Path]:
-    msvc_platform = msvc_platform_from_arch(machine.arch)
-    native_msvc_platform = msvc_platform_from_arch(build_machine.arch)
+    msvc_platform = machine.msvc_platform
+    native_msvc_platform = build_machine.msvc_platform
 
     msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
     msvc_bindir = msvc_dir / "bin" / ("Host" + native_msvc_platform) / msvc_platform
@@ -117,7 +117,7 @@ def detect_msvs_include_path(toolchain_prefix: Optional[Path]) -> list[Path]:
 
 def detect_msvs_library_path(machine: MachineSpec,
                              toolchain_prefix: Optional[Path]) -> list[Path]:
-    msvc_platform = msvc_platform_from_arch(machine.arch)
+    msvc_platform = machine.msvc_platform
 
     msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
     vc_dir = detect_msvs_installation_dir(toolchain_prefix) / "VC"
@@ -132,10 +132,6 @@ def detect_msvs_library_path(machine: MachineSpec,
         winsdk_dir / "Lib" / winsdk_version / "ucrt" / msvc_platform,
         winsdk_lib_dir,
     ]
-
-
-def msvc_platform_from_arch(arch: str) -> str:
-    return "x64" if arch == "x86_64" else "x86"
 
 
 class MissingDependencyError(Exception):

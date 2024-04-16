@@ -135,7 +135,7 @@ def init_machine_config(machine: MachineSpec,
             vs_dir = winenv.detect_msvs_installation_dir(toolchain_prefix)
             outenv["VSINSTALLDIR"] = str(vs_dir) + "\\"
             outenv["VCINSTALLDIR"] = str(vs_dir / "VC") + "\\"
-            outenv["Platform"] = winenv.msvc_platform_from_arch(machine.arch)
+            outenv["Platform"] = machine.msvc_platform
             outenv["INCLUDE"] = ";".join([str(path) for path in winenv.detect_msvs_include_path(toolchain_prefix)])
             outenv["LIB"] = ";".join([str(path) for path in winenv.detect_msvs_library_path(machine, toolchain_prefix)])
         elif machine != build_machine \
