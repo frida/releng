@@ -151,8 +151,11 @@ class MachineSpec:
         return self.evolve(config=config)
 
     def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
-        if self.os == "windows" and self.arch == "x86_64" and host_machine.arch == "x86":
-            return host_machine
+        if self.os == "windows":
+            if self.arch == "x86_64" and host_machine.arch == "x86":
+                return host_machine
+            if self.arch == host_machine.arch:
+                return host_machine
         return self
 
     @property
