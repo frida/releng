@@ -174,6 +174,12 @@ def init_machine_config(machine: MachineSpec,
                          "ranlib", "readelf", "size", "strip", "windres"]:
             binaries.pop(gnu_tool, None)
 
+        c_like_flags += [
+            "/GS-",
+            "/Gy",
+            "/Zc:inline",
+            "/fp:fast",
+        ]
         if machine.arch == "x86":
             c_like_flags += ["/arch:SSE2"]
 
