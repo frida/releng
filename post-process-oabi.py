@@ -59,7 +59,7 @@ def main():
                             patched_tar.add(artifact_extracted_path, arcname="./")
 
             print(f"Overwriting {artifact_path}")
-            shutil.copyfile(patched_artifact_file, artifact_path)
+            shutil.copy(patched_artifact_file, artifact_path)
 
 
 def steal_object(arm64eoabi_libffi_a_path: Path, arm64e_libffi_a_path: Path):
@@ -79,7 +79,7 @@ def steal_object(arm64eoabi_libffi_a_path: Path, arm64e_libffi_a_path: Path):
         perform("ar", "-x", arm64e_libffi_a_path.absolute(), cwd=nabi_dir)
         dst = Path(oabi_dir) / "aarch64_sysv.S.o"
         dst.unlink()
-        shutil.copyfile(Path(nabi_dir) / "aarch64_sysv.S.o", dst)
+        shutil.copy(Path(nabi_dir) / "aarch64_sysv.S.o", dst)
         with dst.open("rb+") as f:
             f.seek(0xb)
             f.write(struct.pack("B", 0))
