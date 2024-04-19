@@ -202,12 +202,11 @@ def generate_machine_config(machine: MachineSpec,
                 f"--vapidir={vapidir}",
             ])
 
-        if sdk_prefix is not None:
-            builtin_options["vala_args"] = strv_to_meson([
-                "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
-            ])
-
     if sdk_prefix is not None:
+        builtin_options["vala_args"] = strv_to_meson([
+            "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
+        ])
+
         pkg_config_path = [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
         builtin_options["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
