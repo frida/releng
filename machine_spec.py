@@ -5,72 +5,6 @@ import re
 from typing import Optional
 
 
-KERNELS = {
-    "windows": "nt",
-
-    "macos":   "xnu",
-    "ios":     "xnu",
-    "watchos": "xnu",
-    "tvos":    "xnu",
-
-    "qnx":     "nto",
-}
-
-CPU_FAMILIES = {
-    "armbe8":     "arm",
-    "armeabi":    "arm",
-    "armhf":      "arm",
-
-    "arm64":      "aarch64",
-    "arm64e":     "aarch64",
-    "arm64eoabi": "aarch64",
-
-    "mipsel":     "mips",
-    "mips64el":   "mips64",
-}
-
-CPU_TYPES = {
-    "arm":        "armv7",
-    "armbe8":     "armv6",
-    "armhf":      "armv7hf",
-    "armeabi":    "armv7eabi",
-
-    "arm64":      "aarch64",
-    "arm64e":     "aarch64",
-    "arm64eoabi": "aarch64",
-}
-
-CPU_TYPES_PER_OS_OVERRIDES = {
-    "linux": {
-        "arm":        "armv5t",
-        "armbe8":     "armv6t",
-        "armhf":      "armv7a",
-
-        "mips":       "mips1",
-        "mipsel":     "mips1",
-
-        "mips64":     "mips64r2",
-        "mips64el":   "mips64r2",
-    },
-    "android": {
-        "x86":        "i686",
-    },
-    "qnx": {
-        "arm":        "armv6",
-        "armeabi":    "armv7",
-    },
-}
-
-BIG_ENDIAN_ARCHS = {
-    "armbe8",
-    "mips",
-    "mips64",
-    "s390x",
-}
-
-TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm(v\w+)?|aarch64|mips\w*|s390x)$")
-
-
 @dataclass
 class MachineSpec:
     os: str
@@ -282,3 +216,69 @@ def detect_arch() -> str:
     if arch == "amd64":
         arch = "x86_64"
     return arch
+
+
+KERNELS = {
+    "windows": "nt",
+
+    "macos":   "xnu",
+    "ios":     "xnu",
+    "watchos": "xnu",
+    "tvos":    "xnu",
+
+    "qnx":     "nto",
+}
+
+CPU_FAMILIES = {
+    "armbe8":     "arm",
+    "armeabi":    "arm",
+    "armhf":      "arm",
+
+    "arm64":      "aarch64",
+    "arm64e":     "aarch64",
+    "arm64eoabi": "aarch64",
+
+    "mipsel":     "mips",
+    "mips64el":   "mips64",
+}
+
+CPU_TYPES = {
+    "arm":        "armv7",
+    "armbe8":     "armv6",
+    "armhf":      "armv7hf",
+    "armeabi":    "armv7eabi",
+
+    "arm64":      "aarch64",
+    "arm64e":     "aarch64",
+    "arm64eoabi": "aarch64",
+}
+
+CPU_TYPES_PER_OS_OVERRIDES = {
+    "linux": {
+        "arm":        "armv5t",
+        "armbe8":     "armv6t",
+        "armhf":      "armv7a",
+
+        "mips":       "mips1",
+        "mipsel":     "mips1",
+
+        "mips64":     "mips64r2",
+        "mips64el":   "mips64r2",
+    },
+    "android": {
+        "x86":        "i686",
+    },
+    "qnx": {
+        "arm":        "armv6",
+        "armeabi":    "armv7",
+    },
+}
+
+BIG_ENDIAN_ARCHS = {
+    "armbe8",
+    "mips",
+    "mips64",
+    "s390x",
+}
+
+TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm(v\w+)?|aarch64|mips\w*|s390x)$")
