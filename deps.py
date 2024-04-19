@@ -699,9 +699,6 @@ class Builder:
             return False
         if parts[0] == "bin":
             stem = f.stem
-            # TODO: Remove on next bootstrap bump
-            if stem == "7z":
-                return False
             return stem in {"bison", "flex", "m4", "nasm", "vswhere"} or stem.startswith("msys-")
         if parts[0] == "manifest":
             return False
