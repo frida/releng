@@ -210,6 +210,9 @@ def generate_machine_config(machine: MachineSpec,
         pkg_config_path = [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
         builtin_options["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
+        for f in (sdk_prefix / "bin" / build_machine.os_dash_arch).iterdir():
+            binaries[f.stem] = strv_to_meson([str(f)])
+
     needs_wrapper = needs_exe_wrapper(build_machine, machine, environ)
     properties["needs_exe_wrapper"] = bool_to_meson(needs_wrapper)
     if needs_wrapper:
