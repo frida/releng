@@ -192,7 +192,7 @@ dependencies = [
 
 [libnice]
 name = "libnice"
-version = "3c9e960fdb79229b672cbd9e600b4a4f1346409e"
+version = "a0f43f0ea5755ce0374613b0a157be33a9f7d82e"
 url = "https://github.com/frida/libnice.git"
 options = [
     "-Dgupnp=disabled",
