@@ -228,7 +228,7 @@ dependencies = [
 
 [usrsctp]
 name = "usrsctp"
-version = "42627714785294aef2bb31851bdeef5db15f5802"
+version = "f459ae9d3700c06e59d709901e92c08e31c6e623"
 url = "https://github.com/frida/usrsctp.git"
 options = [
     "-Dsctp_inet=false",
