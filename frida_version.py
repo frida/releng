@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import argparse
 from dataclasses import dataclass
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 
 RELENG_DIR = Path(__file__).parent.resolve()
@@ -20,9 +22,18 @@ class FridaVersion:
     commit: str
 
 
-def detect() -> FridaVersion:
+def main(argv: list[str]):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("repo", nargs="?", type=Path, default=ROOT_DIR)
+    args = parser.parse_args()
+
+    version = detect(args.repo)
+    print(version.name)
+
+
+def detect(repo: Path) -> FridaVersion:
     description = subprocess.run(["git", "describe", "--tags", "--always", "--long"],
-                                 cwd=ROOT_DIR,
+                                 cwd=repo,
                                  capture_output=True,
                                  encoding="utf-8").stdout
 
@@ -51,4 +62,4 @@ def detect() -> FridaVersion:
 
 
 if __name__ == "__main__":
-    print(detect().name)
+    main(sys.argv)
