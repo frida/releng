@@ -387,5 +387,5 @@ dependencies = [
 [libcxx]
 when = "machine.is_apple"
 name = "libc++"
-version = "2cd34c97d4c79aa45178ebb02734feb7074b7d61"
+version = "626b6731a24ed412a70b60b5fdaab3f36632d6f6"
 url = "https://github.com/frida/libcxx.git"
