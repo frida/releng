@@ -133,7 +133,7 @@ name = "Brotli"
 version = "01d9e2922ca878965ebcd71ee8965d2a7aadb47a"
 url = "https://github.com/frida/brotli.git"
 
-[minizip]
+[minizip-ng]
 name = "minizip-ng"
 version = "84639b1ee2cbc1c574f9e56b29f30f08c72aa206"
 url = "https://github.com/frida/minizip-ng.git"
