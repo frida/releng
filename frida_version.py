@@ -46,6 +46,11 @@ def detect(repo: Path) -> FridaVersion:
         nano = int(nano)
         if nano > 0:
             micro += 1
+
+        if nano == 0:
+            version_name = f"{major}.{minor}.{micro}"
+        else:
+            version_name = f"{major}.{minor}.{micro}-dev.{nano - 1}"
     else:
         major = 0
         minor = 0
@@ -53,10 +58,7 @@ def detect(repo: Path) -> FridaVersion:
         nano = 0
         commit = tokens[0]
 
-    if nano == 0 and len(tokens) != 1:
-        version_name = f"{major}.{minor}.{micro}"
-    else:
-        version_name = f"{major}.{minor}.{micro}-dev.{nano - 1}"
+        version_name = "0.0.0"
 
     return FridaVersion(version_name, major, minor, micro, nano, commit)
 
