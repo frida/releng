@@ -914,8 +914,10 @@ def configure_bootstrap_version(version: str):
     f.write(config)
 
 
-def query_repo_commits(repo_name: str) -> dict:
-    request = urllib.request.Request(f"https://api.github.com/repos/frida/{repo_name}/commits/main")
+def query_repo_commits(repo: str,
+                       organization: str = "frida",
+                       branch: str = "main") -> dict:
+    request = urllib.request.Request(f"https://api.github.com/repos/{organization}/{repo}/commits/{branch}")
     request.add_header("Authorization", make_github_auth_header())
     with urllib.request.urlopen(request) as r:
         return json.load(r)
