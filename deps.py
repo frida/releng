@@ -844,15 +844,7 @@ def wait(bundle: Bundle, machine: MachineSpec):
 
 
 def bump():
-    params = load_dependency_parameters()
-
-    auth_blob = base64.b64encode(":".join([
-                                              os.environ["GH_USERNAME"],
-                                              os.environ["GH_TOKEN"]
-                                          ]).encode("utf-8")).decode("utf-8")
-    auth_header = "Basic " + auth_blob
-
-    for identifier, pkg in params.packages.items():
+    for identifier, pkg in load_dependency_parameters().packages.items():
         url = pkg.url
         if not url.startswith("https://github.com/frida/"):
             continue
@@ -860,15 +852,7 @@ def bump():
         print(f"*** Checking {pkg.name}")
 
         repo_name = url.split("/")[-1][:-4]
-        branch_name = "next" if repo_name == "capstone" else "main"
-
-        url = f"https://api.github.com/repos/frida/{repo_name}/commits/main"
-        request = urllib.request.Request(url)
-        request.add_header("Authorization", auth_header)
-        with urllib.request.urlopen(request) as r:
-            response = json.load(r)
-
-        latest = response['sha']
+        latest = query_repo_commits(repo_name)["sha"]
         if pkg.version == latest:
             print(f"\tup-to-date")
         else:
@@ -928,6 +912,20 @@ def configure_bootstrap_version(version: str):
     config = f.read()
     config["dependencies"]["bootstrap_version"] = version
     f.write(config)
+
+
+def query_repo_commits(repo_name: str) -> dict:
+    request = urllib.request.Request(f"https://api.github.com/repos/frida/{repo_name}/commits/main")
+    request.add_header("Authorization", make_github_auth_header())
+    with urllib.request.urlopen(request) as r:
+        return json.load(r)
+
+
+def make_github_auth_header() -> str:
+    return "Basic " + base64.b64encode(":".join([
+                                           os.environ["GH_USERNAME"],
+                                           os.environ["GH_TOKEN"]
+                                       ]).encode("utf-8")).decode("utf-8")
 
 
 def parse_option(v: Union[str, dict]) -> OptionSpec:
