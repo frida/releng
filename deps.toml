@@ -297,7 +297,7 @@ url = "https://github.com/frida/nghttp2.git"
 
 [libsoup]
 name = "libsoup"
-version = "ecf0161ebfd752746a2f305ca1f506948853526e"
+version = "80dc080951c9037aef51a40ffbe4508d3ce98d1b"
 url = "https://github.com/frida/libsoup.git"
 options = [
     "-Dgssapi=disabled",
