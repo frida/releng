@@ -135,7 +135,7 @@ url = "https://github.com/frida/brotli.git"
 
 [minizip-ng]
 name = "minizip-ng"
-version = "84639b1ee2cbc1c574f9e56b29f30f08c72aa206"
+version = "dfc1ccc070ff7bb50726c80215cac515253a8ba0"
 url = "https://github.com/frida/minizip-ng.git"
 options = [
     "-Dzlib=enabled",
