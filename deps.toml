@@ -209,7 +209,7 @@ dependencies = [
 
 [lwip]
 name = "lwip"
-version = "0c1b36894deeece78eee522278c93483e92d5936"
+version = "f669c58256feff196aeeecc712761ce01a0b2a56"
 url = "https://github.com/frida/lwip.git"
 options = [
     "-Dipv4=disabled",
