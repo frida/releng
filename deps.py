@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import base64
+from configparser import ConfigParser
 import dataclasses
 from dataclasses import dataclass, field
 from enum import Enum
@@ -10,6 +11,7 @@ import itertools
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -334,10 +336,7 @@ class Builder:
                 selected_packages = {i: p for i, p, in all_packages.items() if p.scope is None}
             selected_packages = {i: p for i, p in selected_packages.items() if i not in excluded_packages}
 
-            ts = graphlib.TopologicalSorter({pkg.identifier: {dep.identifier for dep in pkg.dependencies} \
-                    for pkg in selected_packages.values()})
-            packages = [selected_packages[identifier] for identifier in ts.static_order()]
-
+            packages = [selected_packages[i] for i in iterate_package_ids_in_dependency_order(selected_packages.values())]
             all_deps = itertools.chain.from_iterable([pkg.dependencies for pkg in packages])
             deps_for_build_machine = {dep.identifier for dep in all_deps if dep.for_machine == "build"}
 
@@ -844,19 +843,26 @@ def wait(bundle: Bundle, machine: MachineSpec):
 
 
 def bump():
-    for identifier, pkg in load_dependency_parameters().packages.items():
-        url = pkg.url
-        if not url.startswith("https://github.com/frida/"):
-            continue
+    def run(argv: list[str], **kwargs) -> subprocess.CompletedProcess:
+        return subprocess.run(argv,
+                              capture_output=True,
+                              encoding="utf-8",
+                              check=True,
+                              **kwargs)
 
-        print(f"*** Checking {pkg.name}")
+    packages = load_dependency_parameters().packages
+    for identifier in iterate_package_ids_in_dependency_order(packages.values()):
+        pkg = packages[identifier]
+        print(f"# Checking {pkg.name}")
+        assert pkg.url.startswith("https://github.com/frida/"), f"{pkg.url}: unhandled URL"
 
-        repo_name = url.split("/")[-1][:-4]
-        latest = query_repo_commits(repo_name)["sha"]
+        bump_wraps(identifier, packages, run)
+
+        latest = query_repo_commits(identifier)["sha"]
         if pkg.version == latest:
-            print(f"\tup-to-date")
+            print(f"\tdeps.toml is up-to-date")
         else:
-            print(f"\toutdated")
+            print(f"\tdeps.toml is outdated")
             print(f"\t\tcurrent: {pkg.version}")
             print(f"\t\t latest: {latest}")
 
@@ -865,14 +871,93 @@ def bump():
             config[identifier]["version"] = latest
             f.write(config)
 
-            subprocess.run(["git", "add", "deps.toml"],
-                           cwd=RELENG_DIR,
-                           check=True)
-            subprocess.run(["git", "commit", "-m" f"deps: Bump {pkg.name} to {latest[:7]}"],
-                           cwd=RELENG_DIR,
-                           check=True)
+            run(["git", "add", "deps.toml"], cwd=RELENG_DIR)
+            run(["git", "commit", "-m" f"deps: Bump {pkg.name} to {latest[:7]}"], cwd=RELENG_DIR)
+
+            packages = load_dependency_parameters().packages
 
         print("")
+
+
+def bump_wraps(identifier: str,
+               packages: Mapping[str, PackageSpec],
+               run: Callable):
+    root = query_repo_trees(identifier)
+    subp_dir = next((t for t in root["tree"] if t["path"] == "subprojects"), None)
+    if subp_dir is None or subp_dir["type"] != "tree":
+        print("\tno wraps to bump")
+        return
+
+    all_wraps = [(entry, identifier_from_wrap_filename(entry["path"]))
+                 for entry in query_github_api(subp_dir["url"])["tree"]
+                 if entry["type"] == "blob" and entry["path"].endswith(".wrap")]
+    relevant_wraps = [(blob, packages[identifier])
+                      for blob, identifier in all_wraps
+                      if identifier in packages]
+    if not relevant_wraps:
+        print(f"\tno relevant wraps, only: {', '.join([blob['path'] for blob, _ in all_wraps])}")
+        return
+
+    pending_wraps: list[tuple[str, str, PackageSpec]] = []
+    for blob, spec in relevant_wraps:
+        filename = blob["path"]
+
+        response = query_github_api(blob["url"])
+        assert response["encoding"] == "base64"
+        data = base64.b64decode(response["content"])
+
+        config = ConfigParser()
+        config.read_file(data.decode("utf-8").split("\n"))
+
+        if "wrap-git" not in config:
+            print(f"\tskipping {filename} as it's not wrap-git")
+            continue
+        source = config["wrap-git"]
+
+        url = source["url"]
+        if not url.startswith("https://github.com/frida/"):
+            print(f"\tskipping {filename} as URL is external: {url}")
+            continue
+
+        revision = source["revision"]
+        if revision == spec.version:
+            continue
+
+        pending_wraps.append((filename, revision, spec))
+    if not pending_wraps:
+        print(f"\tall wraps up-to-date")
+        return
+
+    workdir = detect_cache_dir(ROOT_DIR) / "src"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    sourcedir = workdir / identifier
+    if sourcedir.exists():
+        shutil.rmtree(sourcedir)
+    run(["git", "clone", "--depth", "1", f"git@github.com:frida/{identifier}.git"], cwd=workdir)
+
+    subpdir = sourcedir / "subprojects"
+    revision_pattern = re.compile(r"^(?P<key_equals>\s*revision\s*=\s*)\S+$", re.MULTILINE)
+    for filename, revision, dep in pending_wraps:
+        wrapfile = subpdir / filename
+        old_config = wrapfile.read_text(encoding="utf-8")
+        # Would be simpler to use ConfigParser to write it back out, but we
+        # want to preserve the particular style to keep our patches minimal.
+        new_config = revision_pattern.sub(fr"\g<key_equals>{dep.version}", old_config)
+        wrapfile.write_text(new_config, encoding="utf-8")
+
+        run(["git", "add", filename], cwd=subpdir)
+
+        action = "Pin" if revision == "main" else "Bump"
+        run(["git", "commit", "-m" f"subprojects: {action} {dep.name} to {dep.version[:7]}"], cwd=sourcedir)
+
+        print(f"\tdid {action.lower()} {filename} to {dep.version} (from {revision})")
+
+    run(["git", "push"], cwd=sourcedir)
+
+
+def identifier_from_wrap_filename(filename: str) -> str:
+    return filename.split(".", maxsplit=1)[0]
 
 
 def compute_bundle_parameters(bundle: Bundle,
@@ -907,6 +992,12 @@ def load_dependency_parameters() -> DependencyParameters:
     return DependencyParameters(p["version"], p["bootstrap_version"], packages)
 
 
+def iterate_package_ids_in_dependency_order(packages: Sequence[PackageSpec]) -> Iterator[str]:
+    ts = graphlib.TopologicalSorter({pkg.identifier: {dep.identifier for dep in pkg.dependencies}
+                                     for pkg in packages})
+    return ts.static_order()
+
+
 def configure_bootstrap_version(version: str):
     f = TOMLFile(DEPS_TOML_PATH)
     config = f.read()
@@ -917,10 +1008,24 @@ def configure_bootstrap_version(version: str):
 def query_repo_commits(repo: str,
                        organization: str = "frida",
                        branch: str = "main") -> dict:
-    request = urllib.request.Request(f"https://api.github.com/repos/{organization}/{repo}/commits/{branch}")
+    return query_github_api(make_github_url(f"/repos/{organization}/{repo}/commits/{branch}"))
+
+
+def query_repo_trees(repo: str,
+                     organization: str = "frida",
+                     branch: str = "main") -> dict:
+    return query_github_api(make_github_url(f"/repos/{organization}/{repo}/git/trees/{branch}"))
+
+
+def query_github_api(url: str) -> dict:
+    request = urllib.request.Request(url)
     request.add_header("Authorization", make_github_auth_header())
     with urllib.request.urlopen(request) as r:
         return json.load(r)
+
+
+def make_github_url(path: str) -> str:
+    return "https://api.github.com" + path
 
 
 def make_github_auth_header() -> str:
