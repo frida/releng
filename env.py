@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -202,18 +203,21 @@ def generate_machine_config(machine: MachineSpec,
                 f"--vapidir={vapidir}",
             ])
 
+    pkg_config_path = shlex.split(environ.get("PKG_CONFIG_PATH", "").replace("\\", "\\\\"))
+
     if sdk_prefix is not None:
         builtin_options["vala_args"] = strv_to_meson([
             "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
         ])
 
-        pkg_config_path = [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
-        builtin_options["pkg_config_path"] = strv_to_meson(pkg_config_path)
+        pkg_config_path += [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
 
         sdk_bindir = sdk_prefix / "bin" / build_machine.os_dash_arch
         if sdk_bindir.exists():
             for f in sdk_bindir.iterdir():
                 binaries[f.stem] = strv_to_meson([str(f)])
+
+    builtin_options["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
     needs_wrapper = needs_exe_wrapper(build_machine, machine, environ)
     properties["needs_exe_wrapper"] = bool_to_meson(needs_wrapper)
@@ -342,6 +346,7 @@ TOOLCHAIN_ENVVARS = {
     "CMAKE",
     "QMAKE",
     "PKG_CONFIG",
+    "PKG_CONFIG_PATH",
     "MAKE",
     "VAPIGEN",
     "LLVM_CONFIG",
