@@ -36,6 +36,15 @@ def init_machine_config(machine: MachineSpec,
         except subprocess.CalledProcessError as e:
             raise XCRunError("\n\t| ".join(e.stderr.strip().split("\n")))
 
+    clang_arch = APPLE_CLANG_ARCHS.get(machine.arch, machine.arch)
+
+    os_minver = APPLE_MINIMUM_OS_VERSIONS.get(machine.os_dash_arch,
+                                              APPLE_MINIMUM_OS_VERSIONS[machine.os])
+
+    target = f"{clang_arch}-apple-{machine.os}{os_minver}"
+    if machine.config is not None:
+        target += "-" + machine.config
+
     sdk_name = APPLE_SDKS[machine.os_dash_config]
     sdk_path = xcrun("--sdk", sdk_name, "--show-sdk-path")
 
@@ -59,21 +68,14 @@ def init_machine_config(machine: MachineSpec,
             argv += rest[0]
         if identifier == "cpp" and not use_static_libcxx:
             argv += ["-stdlib=libc++"]
+        if identifier == "swift":
+            argv += ["-target", target, "-sdk", sdk_path]
 
         raw_val = str(argv)
         if identifier in {"c", "cpp"}:
             raw_val += " + common_flags"
 
         binaries[identifier] = raw_val
-
-    clang_arch = APPLE_CLANG_ARCHS.get(machine.arch, machine.arch)
-
-    os_minver = APPLE_MINIMUM_OS_VERSIONS.get(machine.os_dash_arch,
-                                              APPLE_MINIMUM_OS_VERSIONS[machine.os])
-
-    target = f"{clang_arch}-apple-{machine.os}{os_minver}"
-    if machine.config is not None:
-        target += "-" + machine.config
 
     read_envflags = lambda name: shlex.split(environ.get(name, ""))
 
@@ -159,6 +161,7 @@ APPLE_BINARIES = [
     ("cpp",               "clang++"),
     ("objc",              "#c"),
     ("objcpp",            "#cpp"),
+    ("swift",             "swiftc"),
 
     ("ar",                "ar"),
     ("nm",                "llvm-nm"),
