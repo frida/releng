@@ -148,7 +148,7 @@ APPLE_CLANG_ARCHS = {
 }
 
 APPLE_MINIMUM_OS_VERSIONS = {
-    "macos":        "10.9",
+    "macos":        "10.13",
     "macos-arm64":  "11.0",
     "macos-arm64e": "11.0",
     "ios":          "8.0",
