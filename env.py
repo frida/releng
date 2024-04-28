@@ -203,6 +203,10 @@ def generate_machine_config(machine: MachineSpec,
                 f"--vapidir={vapidir}",
             ])
 
+    qmake6 = shutil.which("qmake6")
+    if qmake6 is not None:
+        binaries["qmake6"] = strv_to_meson([qmake6])
+
     pkg_config_path = shlex.split(environ.get("PKG_CONFIG_PATH", "").replace("\\", "\\\\"))
 
     if sdk_prefix is not None:
