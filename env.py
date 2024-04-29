@@ -219,6 +219,7 @@ def generate_machine_config(machine: MachineSpec,
         valac, vapidir = vala_compiler
         vala = [
             str(valac),
+            "--target-glib=2.76",
             f"--vapidir={vapidir}",
         ]
         if pkg_config is not None:
