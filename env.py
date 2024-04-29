@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import platform
+import pprint
 import shlex
 import shutil
 import subprocess
@@ -132,6 +133,7 @@ def generate_machine_config(machine: MachineSpec,
 
     outpath = []
     outenv = OrderedDict()
+    outdir.mkdir(parents=True, exist_ok=True)
 
     if machine.is_apple:
         impl = env_apple
@@ -155,6 +157,8 @@ def generate_machine_config(machine: MachineSpec,
     if machine.toolchain_is_msvc:
         builtin_options["b_vscrt"] = str_to_meson(machine.config)
 
+    pkg_config = None
+    vala_compiler = None
     if toolchain_prefix is not None:
         toolchain_bindir = toolchain_prefix / "bin"
         exe_suffix = build_machine.executable_suffix
@@ -196,16 +200,6 @@ def generate_machine_config(machine: MachineSpec,
             binaries["pkg-config"] = strv_to_meson(pkg_config)
 
         vala_compiler = detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
-        if vala_compiler is not None:
-            valac, vapidir = vala_compiler
-            binaries["vala"] = strv_to_meson([
-                str(valac),
-                f"--vapidir={vapidir}",
-            ])
-
-    qmake6 = shutil.which("qmake6")
-    if qmake6 is not None:
-        binaries["qmake6"] = strv_to_meson([qmake6])
 
     pkg_config_path = shlex.split(environ.get("PKG_CONFIG_PATH", "").replace("\\", "\\\\"))
 
@@ -221,6 +215,22 @@ def generate_machine_config(machine: MachineSpec,
             for f in sdk_bindir.iterdir():
                 binaries[f.stem] = strv_to_meson([str(f)])
 
+    if vala_compiler is not None:
+        valac, vapidir = vala_compiler
+        vala = [
+            str(valac),
+            f"--vapidir={vapidir}",
+        ]
+        if pkg_config is not None:
+            wrapper = outdir / "frida-pkg-config.py"
+            wrapper.write_text(make_pkg_config_wrapper(pkg_config, pkg_config_path), encoding="utf-8")
+            vala += [f"--pkg-config={quote(sys.executable)} {quote(str(wrapper))}"]
+        binaries["vala"] = strv_to_meson(vala)
+
+    qmake6 = shutil.which("qmake6")
+    if qmake6 is not None:
+        binaries["qmake6"] = strv_to_meson([qmake6])
+
     builtin_options["pkg_config_path"] = strv_to_meson(pkg_config_path)
 
     needs_wrapper = needs_exe_wrapper(build_machine, machine, environ)
@@ -230,7 +240,6 @@ def generate_machine_config(machine: MachineSpec,
         if wrapper is not None:
             binaries["exe_wrapper"] = strv_to_meson(wrapper)
 
-    outdir.mkdir(parents=True, exist_ok=True)
     machine_file = outdir / f"frida-{machine.identifier}.txt"
     with machine_file.open("w", encoding="utf-8") as f:
         config.write(f)
@@ -285,6 +294,25 @@ def find_exe_wrapper(machine: MachineSpec,
     return [qemu_binary, "-L", qemu_sysroot]
 
 
+def make_pkg_config_wrapper(pkg_config: list[str], pkg_config_path: list[str]) -> str:
+    return "\n".join([
+        "import os",
+        "import subprocess",
+        "import sys",
+        "",
+        "args = [",
+        f" {pprint.pformat(pkg_config, indent=4)[1:-1]},",
+        "    *sys.argv[1:],",
+        "]",
+        "env = {",
+        "    **os.environ,",
+        f"    'PKG_CONFIG_PATH': {repr(os.pathsep.join(pkg_config_path))},",
+        "}",
+        f"p = subprocess.run(args, env=env)",
+        "sys.exit(p.returncode)"
+    ])
+
+
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
                                    build_machine: MachineSpec) -> Optional[tuple[Path, Path]]:
     datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
@@ -302,6 +330,12 @@ def build_envvar_to_host(name: str) -> str:
     if name.endswith("_FOR_BUILD"):
         return name[:-10]
     return name
+
+
+def quote(s: str) -> str:
+    if " " not in s:
+        return s
+    return "\"" + s.replace("\"", "\\\"") + "\""
 
 
 class QEMUNotFoundError(Exception):
