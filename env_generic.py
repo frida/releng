@@ -233,6 +233,17 @@ def resolve_gcc_binaries(toolprefix: str = "") -> tuple[list[str], dict[str, str
         if val is None:
             raise CompilerNotFoundError(f"missing {full_name}")
 
+        # QNX SDP 6.5 gcc-* tools are broken, erroring out with:
+        # > sorry - this program has been built without plugin support
+        # We detect this and use the tool without the gcc-* prefix.
+        if name.startswith("gcc-"):
+            p = subprocess.run([val, "--version"], capture_output=True)
+            if p.returncode != 0:
+                full_name = toolprefix + name[4:]
+                val = shutil.which(full_name)
+                if val is None:
+                    raise CompilerNotFoundError(f"missing {full_name}")
+
         if identifier == "c":
             cc = [val]
 
