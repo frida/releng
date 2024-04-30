@@ -47,38 +47,41 @@ def main():
         "help": "bundle (default: sdk)",
         "type": parse_bundle_option_value,
     }
-    host_opt_kwargs = {
+    machine_opt_kwargs = {
         "help": f"os/arch (default: {default_machine})",
         "type": MachineSpec.parse,
     }
 
     command = subparsers.add_parser("sync", help="ensure prebuilt dependencies are up-to-date")
     command.add_argument("bundle", **bundle_opt_kwargs)
-    command.add_argument("host", **host_opt_kwargs)
+    command.add_argument("host", **machine_opt_kwargs)
     command.add_argument("location", help="filesystem location", type=Path)
     command.set_defaults(func=lambda args: sync(args.bundle, args.host, args.location.resolve()))
 
     command = subparsers.add_parser("roll", help="build and upload prebuilt dependencies if needed")
     command.add_argument("bundle", **bundle_opt_kwargs)
-    command.add_argument("host", **host_opt_kwargs)
+    command.add_argument("host", **machine_opt_kwargs)
+    command.add_argument("--build", default=default_machine, **machine_opt_kwargs)
     command.add_argument("--activate", default=False, action='store_true')
     command.add_argument("--post", help="post-processing script")
-    command.set_defaults(func=lambda args: roll(args.bundle, args.host, args.activate,
+    command.set_defaults(func=lambda args: roll(args.bundle, args.build, args.host, args.activate,
                                                 Path(args.post) if args.post is not None else None))
 
     command = subparsers.add_parser("build", help="build prebuilt dependencies")
     command.add_argument("--bundle", default=Bundle.SDK, **bundle_opt_kwargs)
-    command.add_argument("--host", default=default_machine, **host_opt_kwargs)
+    command.add_argument("--build", default=default_machine, **machine_opt_kwargs)
+    command.add_argument("--host", default=default_machine, **machine_opt_kwargs)
     command.add_argument("--only", help="only build packages A, B, and C", metavar="A,B,C",
                          type=parse_set_option_value)
     command.add_argument("--exclude", help="exclude packages A, B, and C", metavar="A,B,C",
                          type=parse_set_option_value, default=set())
     command.add_argument("-v", "--verbose", help="be verbose", action="store_true")
-    command.set_defaults(func=lambda args: build(args.bundle, args.host, args.only, args.exclude, args.verbose))
+    command.set_defaults(func=lambda args: build(args.bundle, args.build, args.host,
+                                                 args.only, args.exclude, args.verbose))
 
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", **bundle_opt_kwargs)
-    command.add_argument("host", **host_opt_kwargs)
+    command.add_argument("host", **machine_opt_kwargs)
     command.set_defaults(func=lambda args: wait(args.bundle, args.host))
 
     command = subparsers.add_parser("bump", help="bump dependency versions")
@@ -218,35 +221,39 @@ def sync(bundle: Bundle,
     return state
 
 
-def roll(bundle: Bundle, machine: MachineSpec, activate: bool, post: Optional[Path]):
+def roll(bundle: Bundle,
+         build_machine: MachineSpec,
+         host_machine: MachineSpec,
+         activate: bool,
+         post: Optional[Path]):
     params = load_dependency_parameters()
     version = params.deps_version
 
     if activate and bundle == Bundle.SDK:
         configure_bootstrap_version(version)
 
-    (public_url, filename) = compute_bundle_parameters(bundle, machine, version)
+    #(public_url, filename) = compute_bundle_parameters(bundle, host_machine, version)
 
-    # First do a quick check to avoid hitting S3 in most cases.
-    request = urllib.request.Request(public_url)
-    request.get_method = lambda: "HEAD"
-    try:
-        with urllib.request.urlopen(request) as r:
-            return
-    except urllib.request.HTTPError as e:
-        if e.code != 404:
-            raise CommandError("network error") from e
+    ## First do a quick check to avoid hitting S3 in most cases.
+    #request = urllib.request.Request(public_url)
+    #request.get_method = lambda: "HEAD"
+    #try:
+    #    with urllib.request.urlopen(request) as r:
+    #        return
+    #except urllib.request.HTTPError as e:
+    #    if e.code != 404:
+    #        raise CommandError("network error") from e
 
-    s3_url = "s3://build.frida.re/deps/{version}/{filename}".format(version=version, filename=filename)
+    #s3_url = "s3://build.frida.re/deps/{version}/{filename}".format(version=version, filename=filename)
 
-    # We will most likely need to build, but let's check S3 to be certain.
-    r = subprocess.run(["aws", "s3", "ls", s3_url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
-    if r.returncode == 0:
-        return
-    if r.returncode != 1:
-        raise CommandError(f"unable to access S3: {r.stdout.strip()}")
+    ## We will most likely need to build, but let's check S3 to be certain.
+    #r = subprocess.run(["aws", "s3", "ls", s3_url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
+    #if r.returncode == 0:
+    #    return
+    #if r.returncode != 1:
+    #    raise CommandError(f"unable to access S3: {r.stdout.strip()}")
 
-    artifact = build(bundle, machine)
+    artifact = build(bundle, build_machine, host_machine)
 
     if post is not None:
         post_script = RELENG_DIR / post
@@ -256,27 +263,28 @@ def roll(bundle: Bundle, machine: MachineSpec, activate: bool, post: Optional[Pa
         subprocess.run([
                            sys.executable, post_script,
                            "--bundle=" + bundle.name.lower(),
-                           "--host=" + machine.identifier,
+                           "--host=" + host_machine.identifier,
                            "--artifact=" + str(artifact),
                            "--version=" + version,
                        ],
                        check=True)
 
-    subprocess.run(["aws", "s3", "cp", artifact, s3_url], check=True)
+    #subprocess.run(["aws", "s3", "cp", artifact, s3_url], check=True)
 
-    # Use the shell for Windows compatibility, where npm generates a .bat script.
-    subprocess.run("cfcli purge " + public_url, shell=True, check=True)
+    ## Use the shell for Windows compatibility, where npm generates a .bat script.
+    #subprocess.run("cfcli purge " + public_url, shell=True, check=True)
 
-    if activate and bundle == Bundle.TOOLCHAIN:
-        configure_bootstrap_version(version)
+    #if activate and bundle == Bundle.TOOLCHAIN:
+    #    configure_bootstrap_version(version)
 
 
 def build(bundle: Bundle,
-          machine: MachineSpec,
+          build_machine: MachineSpec,
+          host_machine: MachineSpec,
           only_packages: Optional[set[str]] = None,
           excluded_packages: set[str] = set(),
           verbose: bool = False) -> Path:
-    builder = Builder(bundle, machine, verbose)
+    builder = Builder(bundle, build_machine, host_machine, verbose)
     try:
         return builder.build(only_packages, excluded_packages)
     except subprocess.CalledProcessError as e:
@@ -291,13 +299,12 @@ def build(bundle: Bundle,
 class Builder:
     def __init__(self,
                  bundle: Bundle,
+                 build_machine: MachineSpec,
                  host_machine: MachineSpec,
                  verbose: bool):
         self._bundle = bundle
         self._host_machine = host_machine.default_missing()
-        self._build_machine = MachineSpec.make_from_local_system() \
-                .default_missing() \
-                .maybe_adapt_to_host(self._host_machine)
+        self._build_machine = build_machine.default_missing().maybe_adapt_to_host(self._host_machine)
         self._verbose = verbose
         self._default_library = "static"
 
