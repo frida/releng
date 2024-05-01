@@ -232,26 +232,26 @@ def roll(bundle: Bundle,
     if activate and bundle == Bundle.SDK:
         configure_bootstrap_version(version)
 
-    #(public_url, filename) = compute_bundle_parameters(bundle, host_machine, version)
+    (public_url, filename) = compute_bundle_parameters(bundle, host_machine, version)
 
-    ## First do a quick check to avoid hitting S3 in most cases.
-    #request = urllib.request.Request(public_url)
-    #request.get_method = lambda: "HEAD"
-    #try:
-    #    with urllib.request.urlopen(request) as r:
-    #        return
-    #except urllib.request.HTTPError as e:
-    #    if e.code != 404:
-    #        raise CommandError("network error") from e
+    # First do a quick check to avoid hitting S3 in most cases.
+    request = urllib.request.Request(public_url)
+    request.get_method = lambda: "HEAD"
+    try:
+        with urllib.request.urlopen(request) as r:
+            return
+    except urllib.request.HTTPError as e:
+        if e.code != 404:
+            raise CommandError("network error") from e
 
-    #s3_url = "s3://build.frida.re/deps/{version}/{filename}".format(version=version, filename=filename)
+    s3_url = "s3://build.frida.re/deps/{version}/{filename}".format(version=version, filename=filename)
 
-    ## We will most likely need to build, but let's check S3 to be certain.
-    #r = subprocess.run(["aws", "s3", "ls", s3_url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
-    #if r.returncode == 0:
-    #    return
-    #if r.returncode != 1:
-    #    raise CommandError(f"unable to access S3: {r.stdout.strip()}")
+    # We will most likely need to build, but let's check S3 to be certain.
+    r = subprocess.run(["aws", "s3", "ls", s3_url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
+    if r.returncode == 0:
+        return
+    if r.returncode != 1:
+        raise CommandError(f"unable to access S3: {r.stdout.strip()}")
 
     artifact = build(bundle, build_machine, host_machine)
 
@@ -269,13 +269,13 @@ def roll(bundle: Bundle,
                        ],
                        check=True)
 
-    #subprocess.run(["aws", "s3", "cp", artifact, s3_url], check=True)
+    subprocess.run(["aws", "s3", "cp", artifact, s3_url], check=True)
 
-    ## Use the shell for Windows compatibility, where npm generates a .bat script.
-    #subprocess.run("cfcli purge " + public_url, shell=True, check=True)
+    # Use the shell for Windows compatibility, where npm generates a .bat script.
+    subprocess.run("cfcli purge " + public_url, shell=True, check=True)
 
-    #if activate and bundle == Bundle.TOOLCHAIN:
-    #    configure_bootstrap_version(version)
+    if activate and bundle == Bundle.TOOLCHAIN:
+        configure_bootstrap_version(version)
 
 
 def build(bundle: Bundle,
