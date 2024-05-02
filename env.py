@@ -43,7 +43,7 @@ def call_meson(argv, use_submodule, *args, **kwargs):
 
 def query_meson_entrypoint(use_submodule):
     if use_submodule:
-        return [sys.executable, str(Path(__file__).parent / "meson" / "meson.py")]
+        return [sys.executable, str(INTERNAL_MESON_ENTRYPOINT)]
     return ["meson"]
 
 
@@ -342,6 +342,8 @@ def quote(s: str) -> str:
 class QEMUNotFoundError(Exception):
     pass
 
+
+INTERNAL_MESON_ENTRYPOINT = Path(__file__).resolve().parent / "meson" / "meson.py"
 
 # Based on mesonbuild/envconfig.py and mesonbuild/compilers/compilers.py
 TOOLCHAIN_ENVVARS = {

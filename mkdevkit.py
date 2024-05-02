@@ -7,7 +7,7 @@ import subprocess
 import sys
 from typing import Optional
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 from releng import devkit, env, machine_spec
 

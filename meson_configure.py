@@ -10,7 +10,9 @@ import subprocess
 import sys
 from typing import Any, Callable, List, Optional, Sequence
 
-sys.path.insert(0, str(Path(__file__).parent / "meson"))
+RELENG_DIR = Path(__file__).resolve().parent
+
+sys.path.insert(0, str(RELENG_DIR / "meson"))
 import mesonbuild.interpreter
 from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
         UserComboOption, UserFeatureOption, UserOption, UserStringOption

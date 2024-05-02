@@ -22,7 +22,7 @@ import time
 from typing import Callable, Iterator, Optional, Mapping, Sequence, Union
 import urllib.request
 
-RELENG_DIR = Path(__file__).parent.resolve()
+RELENG_DIR = Path(__file__).resolve().parent
 ROOT_DIR = RELENG_DIR.parent
 
 if __name__ == "__main__":
