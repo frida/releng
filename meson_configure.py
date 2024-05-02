@@ -210,9 +210,12 @@ def configure(sourcedir: Path,
     if host_config is not build_config:
         meson_options += [f"--cross-file={host_config.machine_file}"]
 
+    setup_env = host_config.make_merged_environment(environ)
+    setup_env["FRIDA_ALLOWED_PREBUILDS"] = ",".join(allowed_prebuilds)
+
     call_selected_meson(["setup"] + meson_options + extra_meson_options + [builddir],
                         cwd=sourcedir,
-                        env=host_config.make_merged_environment(environ),
+                        env=setup_env,
                         check=True)
 
     shutil.copy(SCRIPTS_DIR / "BSDmakefile", builddir)
