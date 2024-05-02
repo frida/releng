@@ -24,14 +24,14 @@ from .progress import ProgressCallback, print_progress
 
 def main():
     default_sourcedir = Path(sys.argv.pop(1))
-    sourcedir = Path(os.environ.get("FRIDA_SOURCEDIR", default_sourcedir)).resolve()
+    sourcedir = Path(os.environ.get("MESON_SOURCE_ROOT", default_sourcedir)).resolve()
 
     workdir = Path(os.getcwd())
     if workdir.is_relative_to(sourcedir):
         default_builddir = sourcedir / "build"
     else:
         default_builddir = workdir
-    builddir = Path(os.environ.get("FRIDA_BUILDDIR", default_builddir)).resolve()
+    builddir = Path(os.environ.get("MESON_BUILD_ROOT", default_builddir)).resolve()
 
     parser = argparse.ArgumentParser(prog="configure",
                                      add_help=False)

@@ -16,10 +16,10 @@ STANDARD_TARGET_NAMES = ["all", "clean", "distclean", "install", "test"]
 
 def main():
     default_sourcedir = Path(sys.argv.pop(1)).resolve()
-    sourcedir = Path(os.environ.get("FRIDA_SOURCEDIR", default_sourcedir)).resolve()
+    sourcedir = Path(os.environ.get("MESON_SOURCE_ROOT", default_sourcedir)).resolve()
 
     default_builddir = Path(sys.argv.pop(1)).resolve()
-    builddir = Path(os.environ.get("FRIDA_BUILDDIR", default_builddir)).resolve()
+    builddir = Path(os.environ.get("MESON_BUILD_ROOT", default_builddir)).resolve()
 
     parser = argparse.ArgumentParser(prog="make")
     parser.add_argument("targets",
