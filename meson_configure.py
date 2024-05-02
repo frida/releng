@@ -166,10 +166,7 @@ def configure(sourcedir: Path,
         try:
             toolchain_prefix, _ = deps.ensure_toolchain(build_machine, deps_dir, on_progress=on_progress)
         except deps.BundleNotFoundError as e:
-            raise ToolchainNotFoundError("\n".join([
-                f"Unable to download toolchain: {e}",
-                "Specify --without-prebuilds=toolchain to only use tools on your PATH.",
-            ]))
+            raise_toolchain_not_found(e)
     else:
         if project_depends_on_vala_compiler(sourcedir):
             toolchain_prefix = deps.query_toolchain_prefix(build_machine, deps_dir)
@@ -189,20 +186,14 @@ def configure(sourcedir: Path,
         try:
             build_sdk_prefix, _ = deps.ensure_sdk(build_machine, deps_dir, on_progress=on_progress)
         except deps.BundleNotFoundError as e:
-            raise SDKNotFoundError("\n".join([
-                f"Unable to download SDK: {e}",
-                "Specify --without-prebuilds=sdk:build to build dependencies from source code.",
-            ]))
+            raise_sdk_not_found(e, "build", build_machine)
 
     host_sdk_prefix = None
     if is_cross_build and "sdk:host" in allowed_prebuilds:
         try:
             host_sdk_prefix, _ = deps.ensure_sdk(host_machine, deps_dir, on_progress=on_progress)
         except deps.BundleNotFoundError as e:
-            raise SDKNotFoundError("\n".join([
-                f"Unable to download SDK: {e}",
-                "Specify --without-prebuilds=sdk:host to build dependencies from source code.",
-            ]))
+            raise_sdk_not_found(e, "host", host_machine)
 
     build_config, host_config = \
             env.generate_machine_configs(build_machine,
@@ -274,6 +265,36 @@ def parse_bundle_type_set(raw_array: str) -> List[str]:
         else:
             result.add(bundle_type)
     return result
+
+
+def raise_toolchain_not_found(e: Exception):
+    raise ToolchainNotFoundError("\n".join([
+        f"Unable to download toolchain: {e}",
+        "",
+        "Specify --without-prebuilds=toolchain to only use tools on your PATH.",
+        "",
+        "Another option is to do what Frida's CI does:",
+        "",
+        "    ./releng/deps.py build --bundle=toolchain",
+        "",
+        "This produces a tarball in ./deps which gets picked up if you retry `./configure`.",
+        "You may also want to make a backup of it for future reuse.",
+    ]))
+
+
+def raise_sdk_not_found(e: Exception, kind: str, machine: MachineSpec):
+    raise SDKNotFoundError("\n".join([
+        f"Unable to download SDK: {e}",
+        "",
+        f"Specify --without-prebuilds=sdk:{kind} to build dependencies from source code.",
+        "",
+        "Another option is to do what Frida's CI does:",
+        "",
+        f"    ./releng/deps.py build --bundle=sdk --host={machine.identifier}",
+        "",
+        "This produces a tarball in ./deps which gets picked up if you retry `./configure`.",
+        "You may also want to make a backup of it for future reuse.",
+    ]))
 
 
 def generate_out_of_tree_makefile(sourcedir: Path) -> str:
