@@ -447,20 +447,22 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
     workdir = deps_dir / "src"
     workdir.mkdir(parents=True, exist_ok=True)
 
+    git = lambda *args, **kwargs: subprocess.run(["git", *args],
+                                                 **kwargs,
+                                                 capture_output=True,
+                                                 encoding="utf-8")
+    vala_checkout = workdir / "vala"
+    if vala_checkout.exists():
+        shutil.rmtree(vala_checkout)
+    vala_pkg = deps.load_dependency_parameters().packages["vala"]
+    deps.clone_shallow(vala_pkg, vala_checkout, git)
+
     run_kwargs = {
         "stdout": subprocess.PIPE,
         "stderr": subprocess.STDOUT,
         "encoding": "utf-8",
         "check": True,
     }
-
-    vala_checkout = workdir / "vala"
-    if vala_checkout.exists():
-        shutil.rmtree(vala_checkout)
-    subprocess.run(["git", "clone", "--depth", "1", "https://github.com/frida/vala.git", vala_checkout.name],
-                   cwd=vala_checkout.parent,
-                   **run_kwargs)
-
     call_selected_meson([
                             "setup",
                             f"--prefix={toolchain_prefix}",
@@ -469,7 +471,6 @@ def build_vala_compiler(toolchain_prefix: Path, deps_dir: Path, call_selected_me
                         ],
                         cwd=vala_checkout,
                         **run_kwargs)
-
     call_selected_meson(["install"],
                         cwd=vala_checkout / "build",
                         **run_kwargs)
