@@ -8,7 +8,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, Optional
 
 RELENG_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = RELENG_DIR / "meson-scripts"
@@ -119,9 +119,9 @@ def configure(sourcedir: Path,
               host_machine: Optional[MachineSpec] = None,
               environ: dict[str, str] = os.environ,
               default_library: str = "static",
-              allowed_prebuilds: Sequence[str] = None,
+              allowed_prebuilds: set[str] = None,
               meson: str = "internal",
-              extra_meson_options: List[str] = [],
+              extra_meson_options: list[str] = [],
               call_meson: Callable = env.call_meson,
               on_progress: ProgressCallback = print_progress):
     if prefix is None:
@@ -235,7 +235,7 @@ def parse_prefix(raw_prefix: str) -> Path:
     return prefix
 
 
-def query_supported_bundle_types(include_wildcards: bool) -> List[str]:
+def query_supported_bundle_types(include_wildcards: bool) -> list[str]:
     for e in deps.Bundle:
         identifier = e.name.lower()
         if e == deps.Bundle.SDK:
@@ -247,11 +247,11 @@ def query_supported_bundle_types(include_wildcards: bool) -> List[str]:
             yield identifier
 
 
-def query_supported_bundle_type_values() -> List[deps.Bundle]:
+def query_supported_bundle_type_values() -> list[deps.Bundle]:
     return [e for e in deps.Bundle]
 
 
-def parse_bundle_type_set(raw_array: str) -> List[str]:
+def parse_bundle_type_set(raw_array: str) -> list[str]:
     supported_types = list(query_supported_bundle_types(include_wildcards=True))
     result = set()
     for element in raw_array.split(","):
@@ -403,7 +403,7 @@ def help_text_from_meson(description: str) -> str:
     return description
 
 
-def collect_meson_options(options: argparse.Namespace) -> List[str]:
+def collect_meson_options(options: argparse.Namespace) -> list[str]:
     result = []
 
     if not options.enable_symbols:
@@ -428,11 +428,11 @@ def collect_meson_options(options: argparse.Namespace) -> List[str]:
     return result
 
 
-def make_array_option_value_parser(opt: UserOption[Any]) -> Callable[[str], List[str]]:
+def make_array_option_value_parser(opt: UserOption[Any]) -> Callable[[str], list[str]]:
     return lambda v: parse_array_option_value(v, opt)
 
 
-def parse_array_option_value(v: str, opt: UserArrayOption) -> List[str]:
+def parse_array_option_value(v: str, opt: UserArrayOption) -> list[str]:
     vals = [v.strip() for v in v.split(",")]
 
     choices = opt.choices
