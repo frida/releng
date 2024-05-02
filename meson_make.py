@@ -5,7 +5,7 @@ import pickle
 import shlex
 import shutil
 import sys
-from typing import Callable, List
+from typing import Callable
 
 from . import env
 from .meson_configure import configure
@@ -41,7 +41,7 @@ def main():
 
 def make(sourcedir: Path,
          builddir: Path,
-         targets: List[str],
+         targets: list[str],
          environ: dict[str, str] = os.environ,
          call_meson: Callable = env.call_meson):
     if not (builddir / "build.ninja").exists():
