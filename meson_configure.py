@@ -11,6 +11,7 @@ import sys
 from typing import Any, Callable, List, Optional, Sequence
 
 RELENG_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = RELENG_DIR / "meson-scripts"
 
 sys.path.insert(0, str(RELENG_DIR / "meson"))
 import mesonbuild.interpreter
@@ -228,22 +229,10 @@ def configure(sourcedir: Path,
                         env=host_config.make_merged_environment(environ),
                         check=True)
 
-    makefile_path = builddir / "Makefile"
-    if not makefile_path.exists():
-        in_tree = (sourcedir / "Makefile").read_text(encoding="utf-8")
-        out_of_tree = in_tree \
-                .replace('"$(shell pwd)"', shlex.quote(str(sourcedir))) \
-                .replace("./build", ".") \
-                .replace("releng/meson/meson.py",
-                         shlex.quote(str(sourcedir / "releng" / "meson" / "meson.py")))
-        makefile_path.write_text(out_of_tree)
-
-        if platform.system() == "Windows":
-            in_tree = (sourcedir / "make.bat").read_text(encoding="utf-8")
-            out_of_tree = in_tree \
-                    .replace('"%dp0%"', '"' + str(sourcedir) + '"') \
-                    .replace('.\\build', ".")
-            (builddir / "make.bat").write_text(out_of_tree)
+    shutil.copy(SCRIPTS_DIR / "BSDmakefile", builddir)
+    (builddir / "Makefile").write_text(generate_out_of_tree_makefile(sourcedir), encoding="utf-8")
+    if platform.system() == "Windows":
+        (builddir / "make.bat").write_text(generate_out_of_tree_make_bat(sourcedir), encoding="utf-8")
 
     (builddir / "frida-env.dat").write_bytes(pickle.dumps({
         "meson": meson,
@@ -290,6 +279,22 @@ def parse_bundle_type_set(raw_array: str) -> List[str]:
         else:
             result.add(bundle_type)
     return result
+
+
+def generate_out_of_tree_makefile(sourcedir: Path) -> str:
+    m = ((SCRIPTS_DIR / "Makefile").read_text(encoding="utf-8")
+            .replace("sys.argv[1]", "r'" + str(RELENG_DIR.parent) + "'")
+            .replace('"$(shell pwd)"', shlex.quote(str(sourcedir)))
+            .replace("./build", "."))
+    return re.sub(r"git-submodules:.+?(?=\.PHONY:)", "", m, flags=re.MULTILINE | re.DOTALL)
+
+
+def generate_out_of_tree_make_bat(sourcedir: Path) -> str:
+    m = ((SCRIPTS_DIR / "make.bat").read_text(encoding="utf-8")
+            .replace("sys.argv[1]", "r'" + str(RELENG_DIR.parent) + "'")
+            .replace('"%dp0%"', '"' + str(sourcedir) + '"')
+            .replace('.\\build', "\"%dp0%\""))
+    return re.sub(r"if not exist .+?(?=endlocal)", "", m, flags=re.MULTILINE | re.DOTALL)
 
 
 def register_meson_options(meson_option_file: Path, group: argparse._ArgumentGroup):
