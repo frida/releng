@@ -490,25 +490,19 @@ class Builder:
     def _clone_repo_if_needed(self, pkg: PackageSpec):
         sourcedir = self._get_sourcedir(pkg)
 
-        git = lambda *args: subprocess.run(["git", *args],
-                                           cwd=sourcedir,
-                                           capture_output=True,
-                                           encoding="utf-8",
-                                           check=True)
+        git = lambda *args, **kwargs: subprocess.run(["git", *args],
+                                                     **kwargs,
+                                                     capture_output=True,
+                                                     encoding="utf-8")
 
         if sourcedir.exists():
             self._print_status(pkg.name, "Reusing existing checkout")
-            current_rev = git("rev-parse", "FETCH_HEAD").stdout.strip()
+            current_rev = git("rev-parse", "FETCH_HEAD", check=True).stdout.strip()
             if current_rev != pkg.version:
                 self._print_status(pkg.name, "WARNING: Checkout does not match version in deps.toml")
         else:
             self._print_status(pkg.name, "Cloning")
-            sourcedir.mkdir(parents=True, exist_ok=True)
-            git("init")
-            git("remote", "add", "origin", pkg.url)
-            git("fetch", "--depth", "1", "origin", pkg.version)
-            git("checkout", "FETCH_HEAD")
-            git("submodule", "update", "--init", "--recursive", "--depth", "1")
+            clone_shallow(pkg, sourcedir, git)
 
     def _wipe_build_state(self):
         for path in (self._get_outdir(), self._get_builddir_container()):
@@ -1040,6 +1034,16 @@ def make_github_auth_header() -> str:
                                            os.environ["GH_USERNAME"],
                                            os.environ["GH_TOKEN"]
                                        ]).encode("utf-8")).decode("utf-8")
+
+
+def clone_shallow(pkg: PackageSpec, outdir: Path, call_git: Callable):
+    outdir.mkdir(parents=True, exist_ok=True)
+    git = lambda *args: call_git(*args, cwd=outdir, check=True)
+    git("init")
+    git("remote", "add", "origin", pkg.url)
+    git("fetch", "--depth", "1", "origin", pkg.version)
+    git("checkout", "FETCH_HEAD")
+    git("submodule", "update", "--init", "--recursive", "--depth", "1")
 
 
 def parse_option(v: Union[str, dict]) -> OptionSpec:
