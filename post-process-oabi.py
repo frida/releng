@@ -35,6 +35,7 @@ def main():
     with urllib.request.urlopen(arm64e_sdk_url) as response, \
             tempfile.NamedTemporaryFile(suffix=".tar.xz") as archive:
         shutil.copyfileobj(response, archive)
+        archive.flush()
         arm64e_artifact_path = Path(archive.name)
 
         with tempfile.TemporaryDirectory() as patched_artifact_dir:
