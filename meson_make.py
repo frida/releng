@@ -67,6 +67,7 @@ def make(sourcedir: Path,
     if machine_config is None:
         machine_config = env_state["build"]
     meson_env = machine_config.make_merged_environment(environ)
+    meson_env["FRIDA_ALLOWED_PREBUILDS"] = ",".join(env_state["allowed_prebuilds"])
     meson_env["FRIDA_DEPS"] = str(env_state["deps"])
 
     def do_meson_command(args):
