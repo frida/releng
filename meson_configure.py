@@ -98,6 +98,7 @@ def main():
                   options.build,
                   options.host,
                   os.environ,
+                  "included" if options.enable_symbols else "stripped",
                   default_library,
                   allowed_prebuilds,
                   options.meson,
@@ -118,6 +119,7 @@ def configure(sourcedir: Path,
               build_machine: Optional[MachineSpec] = None,
               host_machine: Optional[MachineSpec] = None,
               environ: dict[str, str] = os.environ,
+              debug_symbols: str = "stripped",
               default_library: str = "static",
               allowed_prebuilds: set[str] = None,
               meson: str = "internal",
@@ -158,6 +160,8 @@ def configure(sourcedir: Path,
         f"-Ddefault_library={default_library}",
         *host_machine.meson_optimization_options,
     ]
+    if debug_symbols == "stripped" and host_machine.toolchain_can_strip:
+        meson_options += ["-Dstrip=true"]
 
     deps_dir = deps.detect_cache_dir(sourcedir)
 
@@ -409,13 +413,6 @@ def help_text_from_meson(description: str) -> str:
 
 def collect_meson_options(options: argparse.Namespace) -> list[str]:
     result = []
-
-    if not options.enable_symbols:
-        machine = options.host
-        if machine is None:
-            machine = MachineSpec.make_from_local_system()
-        if machine.toolchain_can_strip:
-            result += ["-Dstrip=true"]
 
     for raw_name, raw_val in vars(options).items():
         if raw_val is None:
