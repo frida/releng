@@ -28,7 +28,7 @@ def main():
     sourcedir = Path(os.environ.get("MESON_SOURCE_ROOT", default_sourcedir)).resolve()
 
     workdir = Path(os.getcwd())
-    if workdir.is_relative_to(sourcedir):
+    if workdir == sourcedir:
         default_builddir = sourcedir / "build"
     else:
         default_builddir = workdir
