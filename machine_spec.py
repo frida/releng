@@ -213,10 +213,14 @@ def detect_os() -> str:
 
 def detect_arch() -> str:
     arch = platform.machine().lower()
-    if arch == "amd64":
-        arch = "x86_64"
-    return arch
+    return ARCHS.get(arch, arch)
 
+
+ARCHS = {
+    "amd64": "x86_64",
+    "armv7l": "armhf",
+    "aarch64": "arm64",
+}
 
 KERNELS = {
     "windows": "nt",
