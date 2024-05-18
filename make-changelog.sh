@@ -42,8 +42,11 @@ summarize_repo_changes ()
       --color=never \
       ${from}..${to} \
       | sort -t "<" -k 3 \
-      | grep -v "test: " \
-      | grep -v "tests: " \
+      | egrep -v "\\bci: " \
+      | egrep -v "\\b\\bsubmodules: Bump releng" \
+      | egrep -v "\\bsubprojects: Bump outdated" \
+      | egrep -v "\\btest: " \
+      | egrep -v "\\btests: " \
       > "$summary" || true
   if [ "$repo" == "frida" ]; then
     grep -Ev "(submodules: Bump outdated|deps: Bump)" "$summary" > "${summary}-filtered" || true
@@ -71,29 +74,24 @@ echo "Released $(head -3 "$log" | grep "^Date: " | cut -c 9-)"
 summarize_repo_changes frida $from $to internal
 
 for module in frida-gum frida-core frida-python frida-node frida-qml frida-clr; do
-  git --no-pager diff $range $module > "$scratch"
-  if grep -q "Subproject commit" "$scratch"; then
-    mod_from=$(grep -E "^-Subproject" "$scratch" | cut -f3 -d" ")
-    mod_to=$(grep -E "^\+Subproject" "$scratch" | cut -f3 -d" ")
-    mod_range=${mod_from}..${mod_to}
-    pushd $module > /dev/null
-    append_log $mod_range
-    summarize_repo_changes $module $mod_from $mod_to internal
-    if [ $module == frida-gum ]; then
-      git diff $mod_range -- bindings/gumjs/generate-runtime.py > "$intdir/bridge-changes"
-      for bridge in $(grep "^-" "$intdir/bridge-changes" | grep -- '-bridge": "' | cut -d '"' -f 2); do
-        bridge_from=$(grep "^-" "$intdir/bridge-changes" | grep '"'$bridge'": "' | cut -d '"' -f 4)
-        bridge_to=$(grep "^+" "$intdir/bridge-changes" | grep '"'$bridge'": "' | cut -d '"' -f 4)
-        pushd ~/src/$bridge > /dev/null
-        summarize_repo_changes $bridge v$bridge_from v$bridge_to internal
-        popd > /dev/null
-      done
-    fi
-    popd > /dev/null
+  mod_range=${from}..${to}
+  pushd subprojects/$module > /dev/null
+  append_log $mod_range
+  summarize_repo_changes $module $from $to internal
+  if [ $module == frida-gum ]; then
+    git diff $mod_range -- bindings/gumjs/generate-runtime.py > "$intdir/bridge-changes"
+    for bridge in $(grep "^-" "$intdir/bridge-changes" | grep -- '-bridge": "' | cut -d '"' -f 2); do
+      bridge_from=$(grep "^-" "$intdir/bridge-changes" | grep '"'$bridge'": "' | cut -d '"' -f 4)
+      bridge_to=$(grep "^+" "$intdir/bridge-changes" | grep '"'$bridge'": "' | cut -d '"' -f 4)
+      pushd ~/src/$bridge > /dev/null
+      summarize_repo_changes $bridge v$bridge_from v$bridge_to internal
+      popd > /dev/null
+    done
   fi
+  popd > /dev/null
 done
 
-git --no-pager diff $range releng/deps.mk > "$scratch"
+git --no-pager diff $range releng/deps.toml > "$scratch"
 bumped_deps=$(grep "_version = " "$scratch" \
     | grep "^-" \
     | cut -c 2- \
