@@ -210,7 +210,7 @@ dependencies = [
 [libusb]
 when = "machine.os in {'windows', 'macos', 'linux'}"
 name = "libusb"
-version = "cf71d6bc3138477b78099ca45df164d039643be6"
+version = "652a6ec6e670857ca07beb2c2aa8be5d28ecb697"
 url = "https://github.com/frida/libusb.git"
 
 [lwip]
