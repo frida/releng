@@ -497,7 +497,7 @@ class Builder:
 
         if sourcedir.exists():
             self._print_status(pkg.name, "Reusing existing checkout")
-            current_rev = git("rev-parse", "FETCH_HEAD", check=True).stdout.strip()
+            current_rev = git("rev-parse", "FETCH_HEAD", cwd=sourcedir, check=True).stdout.strip()
             if current_rev != pkg.version:
                 self._print_status(pkg.name, "WARNING: Checkout does not match version in deps.toml")
         else:
