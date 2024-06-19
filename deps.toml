@@ -20,7 +20,7 @@ dependencies = [
 [vala]
 scope = "toolchain"
 name = "Vala"
-version = "e7800996c9e89a3ca80c8bb2837623d69cec6470"
+version = "eb4a0766c6f3a61eb960ebd800bd18064f336fea"
 url = "https://github.com/frida/vala.git"
 dependencies = [
     "glib",
