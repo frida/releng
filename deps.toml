@@ -366,6 +366,7 @@ options = [
 when = """ \
        machine.config != 'mingw' \
        and not machine.arch.startswith('mips') \
+       and not machine.arch.startswith('powerpc') \
        and machine.os != 'qnx' \
        """
 name = "V8"
