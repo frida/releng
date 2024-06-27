@@ -246,6 +246,8 @@ CPU_FAMILIES = {
 
     "mipsel":     "mips",
     "mips64el":   "mips64",
+
+    "powerpc":    "ppc"
 }
 
 CPU_TYPES = {
@@ -284,7 +286,9 @@ BIG_ENDIAN_ARCHS = {
     "armbe8",
     "mips",
     "mips64",
+    "ppc",
+    "ppc64",
     "s390x",
 }
 
-TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm(v\w+)?|aarch64|mips\w*|s390x)$")
+TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm(v\w+)?|aarch64|mips\w*|powerpc|s390x)$")
