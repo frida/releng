@@ -375,7 +375,7 @@ when = """ \
        and machine.os != 'qnx' \
        """
 name = "V8"
-version = "77a2b0fac0a9e1c2b1ccb06957dbb03781622baf"
+version = "9492bfc5ca8615be651b85336caafa8f3c730cd7"
 url = "https://github.com/frida/v8.git"
 options = [
     "-Ddebug=false",
