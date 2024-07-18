@@ -137,7 +137,7 @@ class MachineSpec:
 
     @property
     def msvc_platform(self) -> str:
-        return "x64" if self.arch == "x86_64" else "x86"
+        return "x64" if self.arch == "x86_64" else self.arch
 
     @property
     def is_apple(self) -> str:
