@@ -356,7 +356,7 @@ when = """ \
        } \
        """
 name = "TinyCC"
-version = "a438164dd4c453ae62c1224b4b7997507a388b3d"
+version = "722c253d8dece3bc9a46b6f510c6682329d838b7"
 url = "https://github.com/frida/tinycc.git"
 
 [openssl]
