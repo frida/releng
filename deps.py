@@ -113,8 +113,10 @@ def parse_set_option_value(v: str) -> set[str]:
 
 def query_toolchain_prefix(machine: MachineSpec,
                            cache_dir: Path) -> Path:
-    identifier = "windows-x86" if machine.os == "windows" and machine.arch in {"x86", "x86_64"} \
-            else machine.identifier
+    if machine.os == "windows":
+        identifier = "windows-x86" if machine.arch in {"x86", "x86_64"} else machine.os_dash_arch
+    else:
+        identifier = machine.identifier
     return cache_dir / f"toolchain-{identifier}"
 
 
@@ -965,7 +967,7 @@ def compute_bundle_parameters(bundle: Bundle,
                               machine: MachineSpec,
                               version: str) -> tuple[str, str]:
     if bundle == Bundle.TOOLCHAIN and machine.os == "windows":
-        os_arch_config = "windows-x86"
+        os_arch_config = "windows-x86" if machine.arch in {"x86", "x86_64"} else machine.os_dash_arch
     else:
         os_arch_config = machine.identifier
     filename = f"{bundle.name.lower()}-{os_arch_config}.tar.xz"
