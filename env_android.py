@@ -64,8 +64,8 @@ def init_machine_config(machine: MachineSpec,
     ]
     c_like_flags = [
         "-DANDROID",
-        "-ffunction-sections",
-        "-fdata-sections",
+        # "-ffunction-sections",
+        # "-fdata-sections",
     ]
     cxx_like_flags = []
     cxx_link_flags = [
