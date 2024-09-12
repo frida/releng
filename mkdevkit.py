@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
+from enum import Enum
 import hashlib
 from pathlib import Path
 import subprocess
 import sys
+import textwrap
 from typing import Dict, List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 from releng import devkit, env, machine_spec
+
+DepSymbolScope = devkit.DepSymbolScope
 
 
 def main():
@@ -33,7 +37,7 @@ def main():
         else:
             raw_args.append(cur)
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("kit")
     parser.add_argument("machine",
                         type=machine_spec.MachineSpec.parse)
@@ -45,6 +49,16 @@ def main():
                         dest="flavor",
                         const="_thin",
                         default="")
+    parser.add_argument("--dep-symbol-scope",
+                        metavar="S",
+                        type=DepSymbolScope,
+                        choices=list(DepSymbolScope),
+                        default=DepSymbolScope.PREFIXED.value,
+                        help=textwrap.dedent("""\
+                            how to scope symbols from third-party archives:
+                             - prefixed: add the '_frida_' prefix
+                             - original: keep symbols exactly as upstream
+                            """))
     parser.add_argument("--cc",
                         help="C compiler to use",
                         type=lambda v: parse_array_option_value(v, ool_optvals))
@@ -82,7 +96,7 @@ def main():
         assert meson_config is not None
 
     try:
-        app = devkit.CompilerApplication(kit, machine, meson_config, outdir)
+        app = devkit.CompilerApplication(kit, machine, meson_config, outdir, options.dep_symbol_scope)
         app.run()
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)

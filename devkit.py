@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from enum import Enum
 import itertools
 import locale
 import os
@@ -27,12 +28,18 @@ ASSETS_PATH = Path(__file__).parent / "devkit-assets"
 INCLUDE_PATTERN = re.compile(r"#include\s+[<\"](.*?)[>\"]")
 
 
+class DepSymbolScope(str, Enum):
+    PREFIXED = "prefixed"
+    ORIGINAL = "original"
+
+
 class CompilerApplication:
     def __init__(self,
                  kit: str,
                  machine: MachineSpec,
                  meson_config: Mapping[str, Union[str, Sequence[str]]],
-                 output_dir: Path):
+                 output_dir: Path,
+                 dep_symbol_scope: DepSymbolScope = DepSymbolScope.PREFIXED):
         self.kit = kit
         package, umbrella_header = DEVKITS[kit]
         self.package = package
@@ -42,6 +49,7 @@ class CompilerApplication:
         self.meson_config = meson_config
         self.compiler_argument_syntax = None
         self.output_dir = output_dir
+        self.dep_symbol_scope = dep_symbol_scope
         self.library_filename = None
 
     def run(self):
@@ -263,9 +271,8 @@ class CompilerApplication:
             shutil.rmtree(combined_dir)
 
         objcopy = meson_config.get("objcopy", None)
-        if objcopy is not None:
+        if self.dep_symbol_scope is DepSymbolScope.PREFIXED and objcopy is not None:
             thirdparty_symbol_mappings = get_thirdparty_symbol_mappings(output_path, meson_config)
-
             renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
             with tempfile.NamedTemporaryFile() as renames_file:
                 renames_file.write(renames.encode("utf-8"))
