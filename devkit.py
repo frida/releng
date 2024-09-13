@@ -263,10 +263,10 @@ class CompilerApplication:
 
         objcopy = meson_config.get("objcopy", None)
         if objcopy is not None:
-            llvm_dis = [objcopy[0].replace("-objcopy", "-dis")]
-            llvm_as = [llvm_dis[0].replace("-dis", "-as")]
-            print("Generating symbol mappings...")
-            thirdparty_symbol_mappings = get_thirdparty_symbol_mappings(output_path, meson_config)
+            # llvm_dis = [objcopy[0].replace("-objcopy", "-dis")]
+            # llvm_as = [llvm_dis[0].replace("-dis", "-as")]
+            # print("Generating symbol mappings...")
+            # thirdparty_symbol_mappings = get_thirdparty_symbol_mappings(output_path, meson_config)
 
             """
                 If there is llvmbc then we must patch the bitcode too.
@@ -277,13 +277,13 @@ class CompilerApplication:
             """
             # rename_symbols_in_library(str(output_path), thirdparty_symbol_mappings, objcopy, llvm_dis, llvm_as)
 
-            renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
-            with tempfile.NamedTemporaryFile() as renames_file:
-                renames_file.write(renames.encode("utf-8"))
-                renames_file.flush()
-                subprocess.run(objcopy + ["--redefine-syms=" + renames_file.name, output_path],
-                               check=True)
-
+            # renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
+            # with tempfile.NamedTemporaryFile() as renames_file:
+            #     renames_file.write(renames.encode("utf-8"))
+            #     renames_file.flush()
+            #     subprocess.run(objcopy + ["--redefine-syms=" + renames_file.name, output_path],
+            #                    check=True)
+            thirdparty_symbol_mappings = []
         else:
             thirdparty_symbol_mappings = []
 
