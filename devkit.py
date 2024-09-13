@@ -275,9 +275,7 @@ class CompilerApplication:
                 3. Patch the IR
                 4. Re-assemble the .o
             """
-            new_archive = rename_symbols_in_library(str(output_path), thirdparty_symbol_mappings, objcopy, llvm_dis, llvm_as)
-            if new_archive:
-                output_path = new_archive
+            # rename_symbols_in_library(str(output_path), thirdparty_symbol_mappings, objcopy, llvm_dis, llvm_as)
 
             renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
             with tempfile.NamedTemporaryFile() as renames_file:
@@ -285,6 +283,7 @@ class CompilerApplication:
                 renames_file.flush()
                 subprocess.run(objcopy + ["--redefine-syms=" + renames_file.name, output_path],
                                check=True)
+
         else:
             thirdparty_symbol_mappings = []
 
@@ -571,6 +570,7 @@ def disassemble_bitcode(llvm_dis, bitcode_file):
 def rename_symbols_in_ll(ll_file, rename_pairs):
     """Rename symbols in the LLVM IR file using sed."""
     print(f"[+] Renaming symbols in {ll_file}")
+
     for old_symbol, new_symbol in rename_pairs:
         with open(ll_file, 'r') as file:
             lines = file.readlines()
@@ -582,16 +582,19 @@ def rename_symbols_in_ll(ll_file, rename_pairs):
         if cautious_symbol:
             print(f"Cautious symbol: {old_symbol}")
 
-        pattern = rf'\B\@{old_symbol}\b'
-
         for line in lines:
             if cautious_symbol:
                 if 'define ' not in line and 'declare ' not in line and 'call ' not in line:
                     modified_lines.append(line)
                     continue
             
-            # modified_line = line.replace(f"@{old_symbol}", f"@{new_symbol}")
-            modified_line = re.sub(pattern, f"@{new_symbol}", line)
+            modified_line = line
+            if f"@{old_symbol}" in modified_line:
+                modified_line = modified_line.replace(f"@{old_symbol}", f"@{new_symbol}")
+            
+            if f"\"{old_symbol}\"" in modified_line:
+                modified_line = modified_line.replace(f"\"{old_symbol}\"", f"\"{new_symbol}\"")
+            
             modified_lines.append(modified_line)
 
         # Write the modified lines back to the file
@@ -651,7 +654,10 @@ def process_object_file(object_file, rename_pairs, objcopy, llvm_dis, llvm_as):
     #     should_copy = True
     # sz = (os.path.getsize(ll_file)) /1024
     # if sz < 30:
-    rename_symbols_in_ll(ll_file, rename_pairs)
+    # rename_symbols_in_ll(ll_file, rename_pairs)
+    with open("/tmp/bitcode.log", "a+") as fo:
+        fo.write(f"Renaming bitcode for {bitcode_path}")
+
     # else:
     #     print(f"[!] Skipped {ll_file} due to size: {sz}kb")
     # if should_copy:
@@ -663,7 +669,7 @@ def process_object_file(object_file, rename_pairs, objcopy, llvm_dis, llvm_as):
 
     # Re-embed the modified bitcode back into the object file
     # print(f"5. re-embedding bitcode in {object_file}: {modified_bitcode}")
-    embed_bitcode(objcopy, object_file, modified_bitcode)
+    # embed_bitcode(objcopy, object_file, modified_bitcode)
 
 
 def rename_symbols_in_library(library_path, rename_pairs, objcopy, llvm_dis, llvm_as):
@@ -672,6 +678,7 @@ def rename_symbols_in_library(library_path, rename_pairs, objcopy, llvm_dis, llv
     output_library_path = library_path + ".out"
 
     # Step 1: Identify bitcode-enabled object files
+    print(f"Tmpdir: {extract_dir.name}")
     bitcode_files = identify_bitcode_files(extract_dir.name)
     print(f"Total files with bitcode: {len(bitcode_files)}")
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -689,7 +696,7 @@ def rename_symbols_in_library(library_path, rename_pairs, objcopy, llvm_dis, llv
                 # Retrieve the result from each future
                 _result = future.result()
             except Exception as e:
-                print(f"Error processing item {item}: {e}")        
+                print(f"Error processing item {item}: {e}")
 
     # Step 3: Rebuild the static library
     print("Re-building .a archive.")
@@ -698,5 +705,6 @@ def rename_symbols_in_library(library_path, rename_pairs, objcopy, llvm_dis, llv
     # Clean up the extracted directory
     extract_dir.cleanup()
 
-    print(f"Modified library saved as {output_library_path}")
-    return output_library_path
+    import shutil
+    shutil.move(output_library_path, library_path)
+    print(f"Modified library saved as {library_path}")
