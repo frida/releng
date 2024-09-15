@@ -31,7 +31,8 @@ class CompilerApplication:
                  kit: str,
                  machine: MachineSpec,
                  meson_config: Mapping[str, Union[str, Sequence[str]]],
-                 output_dir: Path):
+                 output_dir: Path,
+                 prefix_syms: bool = True):
         self.kit = kit
         package, umbrella_header = DEVKITS[kit]
         self.package = package
@@ -42,6 +43,7 @@ class CompilerApplication:
         self.compiler_argument_syntax = None
         self.output_dir = output_dir
         self.library_filename = None
+        self.prefix_syms = prefix_syms
 
     def run(self):
         output_dir = self.output_dir
@@ -263,27 +265,16 @@ class CompilerApplication:
 
         objcopy = meson_config.get("objcopy", None)
         if objcopy is not None:
-            # llvm_dis = [objcopy[0].replace("-objcopy", "-dis")]
-            # llvm_as = [llvm_dis[0].replace("-dis", "-as")]
-            # print("Generating symbol mappings...")
-            # thirdparty_symbol_mappings = get_thirdparty_symbol_mappings(output_path, meson_config)
-
-            """
-                If there is llvmbc then we must patch the bitcode too.
-                1. Check for the llvmbc section
-                2. Extract the IR from the .o
-                3. Patch the IR
-                4. Re-assemble the .o
-            """
-            # rename_symbols_in_library(str(output_path), thirdparty_symbol_mappings, objcopy, llvm_dis, llvm_as)
-
-            # renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
-            # with tempfile.NamedTemporaryFile() as renames_file:
-            #     renames_file.write(renames.encode("utf-8"))
-            #     renames_file.flush()
-            #     subprocess.run(objcopy + ["--redefine-syms=" + renames_file.name, output_path],
-            #                    check=True)
-            thirdparty_symbol_mappings = []
+            # New option to prevent renaming, to avoid erroneous bitcode symbols
+            if self.prefix_syms:
+                renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
+                with tempfile.NamedTemporaryFile() as renames_file:
+                    renames_file.write(renames.encode("utf-8"))
+                    renames_file.flush()
+                    subprocess.run(objcopy + ["--redefine-syms=" + renames_file.name, output_path],
+                                check=True)
+            else:
+                thirdparty_symbol_mappings = []
         else:
             thirdparty_symbol_mappings = []
 
@@ -546,165 +537,3 @@ def tweak_flags(cflags, ldflags):
 
 def deduplicate(items):
     return list(OrderedDict.fromkeys(items))
-
-
-def identify_bitcode_files(extract_dir):
-    """Identify bitcode-enabled object files."""
-    bitcode_files = []
-    for obj_file in os.listdir(extract_dir):
-        obj_path = os.path.join(extract_dir, obj_file)
-        # Check if the file is LLVM bitcode
-        result = subprocess.run(['readelf', '-S', obj_path], capture_output=True, text=True)
-        if '.llvmbc' in result.stdout:
-            bitcode_files.append(obj_path)
-    return bitcode_files
-
-
-def disassemble_bitcode(llvm_dis, bitcode_file):
-    """Disassemble a bitcode object file into LLVM IR (.ll)."""
-    ll_file = bitcode_file.replace('.bc', '.ll')
-    subprocess.run(llvm_dis + [bitcode_file, '-o', ll_file], check=True)
-    return ll_file
-
-
-def rename_symbols_in_ll(ll_file, rename_pairs):
-    """Rename symbols in the LLVM IR file using sed."""
-    print(f"[+] Renaming symbols in {ll_file}")
-
-    for old_symbol, new_symbol in rename_pairs:
-        with open(ll_file, 'r') as file:
-            lines = file.readlines()
-
-        # Regular expression to match function declarations, definitions, and calls for the specific symbol
-        # Prepare a list to hold modified lines
-        modified_lines = []
-        cautious_symbol = "file" == old_symbol or "load" == old_symbol or "store" == old_symbol or "free" == old_symbol or "alloca" == old_symbol
-        if cautious_symbol:
-            print(f"Cautious symbol: {old_symbol}")
-
-        for line in lines:
-            if cautious_symbol:
-                if 'define ' not in line and 'declare ' not in line and 'call ' not in line:
-                    modified_lines.append(line)
-                    continue
-            
-            modified_line = line
-            if f"@{old_symbol}" in modified_line:
-                modified_line = modified_line.replace(f"@{old_symbol}", f"@{new_symbol}")
-            
-            if f"\"{old_symbol}\"" in modified_line:
-                modified_line = modified_line.replace(f"\"{old_symbol}\"", f"\"{new_symbol}\"")
-            
-            modified_lines.append(modified_line)
-
-        # Write the modified lines back to the file
-        with open(ll_file, 'w') as file:
-            file.writelines(modified_lines)
-
-
-def reassemble_bitcode(llvm_as, ll_file):
-    """Reassemble the modified LLVM IR file back to a bitcode object file."""
-    bitcode_file = ll_file.replace('.ll', '.bc')
-    subprocess.run(llvm_as + [ll_file, '-o', bitcode_file], check=True)
-    return bitcode_file
-
-
-def rebuild_library(extract_dir, output_library_path):
-    """Rebuild the static library from modified object files."""
-    object_files = [f for f in os.listdir(extract_dir) if f.endswith('.o')]
-    subprocess.run(['ar', 'rcs', output_library_path] + object_files, cwd=extract_dir, check=True)
-
-
-def extract_bitcode(objcopy, obj_file, bitcode_path):
-    """Extract the .llvmbc section from an object file."""
-    subprocess.run(objcopy + ['--dump-section=.llvmbc=' + bitcode_path, obj_file], check=True)
-
-
-def embed_bitcode(objcopy, obj_file, bitcode_path):
-    """Re-embed the modified bitcode back into the object file."""
-    subprocess.run(objcopy + ['--update-section', f'.llvmbc={bitcode_path}', obj_file], check=True)
-
-
-def extract_objects_from_archive(archive_path):
-    """Extract object files from a static library."""
-    extract_dir = tempfile.TemporaryDirectory()
-    if not os.path.exists(extract_dir.name):
-        os.makedirs(extract_dir.name)
-    if os.path.exists(extract_dir.name):
-        print(f"Path does exist: {extract_dir.name}")
-        subprocess.run(['ar', 'x', archive_path], cwd=extract_dir.name, check=True)
-    return extract_dir
-
-
-def process_object_file(object_file, rename_pairs, objcopy, llvm_dis, llvm_as):
-    # print(f"Processing {object_file}")
-    bitcode_path = object_file.replace('.o', '.bc')
-    # print(f"1. extracting bitcode from {object_file}: {bitcode_path}")
-    extract_bitcode(objcopy, object_file, bitcode_path)
-
-    # Disassemble, rename symbols, and reassemble the bitcode
-    # print(f"2. disassembling bitcode: {bitcode_path}")
-    ll_file = disassemble_bitcode(llvm_dis, bitcode_path)
-    # print(f"3. renaming... {ll_file}")
-    # should_copy = False
-    # if "backend-libdwarf_gumsymbolutil-libdwarf.c." in ll_file:
-    #     import shutil
-    #     print("Copying backend-libdwarf_gumsymbolutil-libdwarf.c.ll instead...")
-    #     shutil.copyfile(ll_file, "/tmp/ll.file")
-    #     should_copy = True
-    # sz = (os.path.getsize(ll_file)) /1024
-    # if sz < 30:
-    # rename_symbols_in_ll(ll_file, rename_pairs)
-    with open("/tmp/bitcode.log", "a+") as fo:
-        fo.write(f"Renaming bitcode for {bitcode_path}")
-
-    # else:
-    #     print(f"[!] Skipped {ll_file} due to size: {sz}kb")
-    # if should_copy:
-    #     import shutil
-    #     shutil.copyfile(ll_file, "/tmp/ll_renamed.file")
-    #     should_copy = True
-    # print(f"4. re-assembling bitcode... {ll_file}")
-    modified_bitcode = reassemble_bitcode(llvm_as, ll_file)
-
-    # Re-embed the modified bitcode back into the object file
-    # print(f"5. re-embedding bitcode in {object_file}: {modified_bitcode}")
-    # embed_bitcode(objcopy, object_file, modified_bitcode)
-
-
-def rename_symbols_in_library(library_path, rename_pairs, objcopy, llvm_dis, llvm_as):
-    """Main function to handle symbol renaming in a bitcode-enabled static library."""
-    extract_dir = extract_objects_from_archive(library_path)
-    output_library_path = library_path + ".out"
-
-    # Step 1: Identify bitcode-enabled object files
-    print(f"Tmpdir: {extract_dir.name}")
-    bitcode_files = identify_bitcode_files(extract_dir.name)
-    print(f"Total files with bitcode: {len(bitcode_files)}")
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    num_threads = 1
-
-    # Step 2: split the workload and process the IR
-    with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        # Submit each item to be processed
-        future_to_item = {executor.submit(process_object_file, item, rename_pairs, objcopy, llvm_dis, llvm_as): item for item in bitcode_files}
-
-        # Collect the results as they complete
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            try:
-                # Retrieve the result from each future
-                _result = future.result()
-            except Exception as e:
-                print(f"Error processing item {item}: {e}")
-
-    # Step 3: Rebuild the static library
-    print("Re-building .a archive.")
-    rebuild_library(extract_dir.name, output_library_path)
-
-    # Clean up the extracted directory
-    extract_dir.cleanup()
-
-    import shutil
-    shutil.move(output_library_path, library_path)
-    print(f"Modified library saved as {library_path}")
