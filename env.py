@@ -69,7 +69,8 @@ def generate_machine_configs(build_machine: MachineSpec,
                              host_sdk_prefix: Optional[Path],
                              call_selected_meson: Callable,
                              default_library: DefaultLibrary,
-                             outdir: Path) -> tuple[MachineConfig, MachineConfig]:
+                             outdir: Path,
+                             options: dict = {}) -> tuple[MachineConfig, MachineConfig]:
     is_cross_build = host_machine != build_machine
 
     if is_cross_build:
@@ -86,7 +87,8 @@ def generate_machine_configs(build_machine: MachineSpec,
                                     build_sdk_prefix,
                                     call_selected_meson,
                                     default_library,
-                                    outdir)
+                                    outdir,
+                                    options)
 
     if is_cross_build:
         host_config = generate_machine_config(host_machine,
@@ -97,7 +99,8 @@ def generate_machine_configs(build_machine: MachineSpec,
                                               host_sdk_prefix,
                                               call_selected_meson,
                                               default_library,
-                                              outdir)
+                                              outdir,
+                                              options)
     else:
         host_config = build_config
 
@@ -112,7 +115,8 @@ def generate_machine_config(machine: MachineSpec,
                             sdk_prefix: Optional[Path],
                             call_selected_meson: Callable,
                             default_library: DefaultLibrary,
-                            outdir: Path) -> MachineConfig:
+                            outdir: Path,
+                            options: dict = {}) -> MachineConfig:
     config = ConfigParser(dict_type=OrderedDict)
     config["constants"] = OrderedDict()
     config["binaries"] = OrderedDict()
@@ -141,10 +145,6 @@ def generate_machine_config(machine: MachineSpec,
         impl = env_android
     else:
         impl = env_generic
-
-    options = {}
-    if 1 == 1:
-        options["EMBED_BITCODE"] = True
 
     impl.init_machine_config(machine,
                              build_machine,
