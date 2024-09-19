@@ -50,7 +50,7 @@ def main():
                         action="store_const",
                         dest="prefix_syms",
                         const="prefix_syms",
-                        default=True)
+                        default=False)
     parser.add_argument("--cc",
                         help="C compiler to use",
                         type=lambda v: parse_array_option_value(v, ool_optvals))

@@ -142,6 +142,10 @@ def generate_machine_config(machine: MachineSpec,
     else:
         impl = env_generic
 
+    options = {}
+    if 1 == 1:
+        options["EMBED_BITCODE"] = True
+
     impl.init_machine_config(machine,
                              build_machine,
                              is_cross_build,
@@ -152,7 +156,8 @@ def generate_machine_config(machine: MachineSpec,
                              config,
                              outpath,
                              outenv,
-                             outdir)
+                             outdir,
+                             options)
 
     if machine.toolchain_is_msvc:
         builtin_options["b_vscrt"] = str_to_meson(machine.config)
