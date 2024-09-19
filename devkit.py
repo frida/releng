@@ -267,7 +267,8 @@ class CompilerApplication:
         if objcopy is not None:
             # New option to prevent renaming, to avoid erroneous bitcode symbols
             if self.prefix_syms:
-                print("PREFIX IS GO!!!!")
+                thirdparty_symbol_mappings = get_thirdparty_symbol_mappings(output_path, meson_config)
+
                 renames = "\n".join([f"{original} {renamed}" for original, renamed in thirdparty_symbol_mappings]) + "\n"
                 with tempfile.NamedTemporaryFile() as renames_file:
                     renames_file.write(renames.encode("utf-8"))
