@@ -18,7 +18,8 @@ def init_machine_config(machine: MachineSpec,
                         config: ConfigParser,
                         outpath: list[str],
                         outenv: dict[str, str],
-                        outdir: Path):
+                        outdir: Path,
+                        options: dict = {}):
     xcenv = {**environ}
     if machine.arch == "arm64eoabi":
         try:
