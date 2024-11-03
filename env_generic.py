@@ -1,3 +1,4 @@
+import locale
 from collections import OrderedDict
 from configparser import ConfigParser
 from pathlib import Path
@@ -74,7 +75,7 @@ def init_machine_config(machine: MachineSpec,
                                           env=environ,
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.STDOUT,
-                                          encoding="utf-8")
+                                          encoding=locale.getpreferredencoding())
             if process.returncode == 0:
                 mcfg = ConfigParser()
                 mcfg.read(machine_file)
@@ -258,8 +259,8 @@ def detect_linker_flavor(cc: list[str]) -> str:
     linker_version = subprocess.run(cc + ["-Wl,--version"],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT,
-                                    encoding="utf-8").stdout
-    if linker_version.startswith("Microsoft "):
+                                    encoding=locale.getpreferredencoding()).stdout
+    if "Microsoft " in linker_version:
         return "msvc"
     if "GNU ld " in linker_version:
         return "gnu-ld"
