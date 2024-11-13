@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import itertools
+import locale
 import os
 from pathlib import Path
 import re
@@ -438,9 +439,9 @@ def call_pkgconfig(argv, meson_config):
 
 
 def detect_compiler_argument_syntax(meson_config):
-    if subprocess.run(meson_config["c"],
+    if "Microsoft " in subprocess.run(meson_config["c"],
                       capture_output=True,
-                      encoding="utf-8").stderr.startswith("Microsoft "):
+                      encoding=locale.getpreferredencoding()).stderr:
         return "msvc"
 
     return "unix"
