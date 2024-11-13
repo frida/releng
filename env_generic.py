@@ -1,6 +1,6 @@
-import locale
 from collections import OrderedDict
 from configparser import ConfigParser
+import locale
 from pathlib import Path
 import shutil
 import subprocess
