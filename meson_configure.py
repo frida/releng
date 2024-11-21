@@ -199,6 +199,10 @@ def configure(sourcedir: Path,
         except deps.BundleNotFoundError as e:
             raise_sdk_not_found(e, "host", host_machine)
 
+    options = {}
+    if '-Dbitcode=true' in extra_meson_options:
+        options["EMBED_BITCODE"] = True
+
     build_config, host_config = \
             env.generate_machine_configs(build_machine,
                                          host_machine,
@@ -208,7 +212,8 @@ def configure(sourcedir: Path,
                                          host_sdk_prefix,
                                          call_selected_meson,
                                          default_library,
-                                         builddir)
+                                         builddir,
+                                         options)
 
     meson_options += [f"--native-file={build_config.machine_file}"]
     if host_config is not build_config:
