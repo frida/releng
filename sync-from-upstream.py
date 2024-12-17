@@ -28,6 +28,7 @@ upstreams = {
     "libxml2": make_gnome_url("libxml2"),
     "libsoup": make_gnome_url("libsoup"),
     "vala": make_gnome_url("vala"),
+    "libdwarf": "https://github.com/davea42/libdwarf-code.git",
     "xz": "https://git.tukaani.org/xz.git",
     "pkg-config": "https://gitlab.freedesktop.org/pkg-config/pkg-config.git",
     "quickjs": ("https://github.com/bellard/quickjs.git", "master"),
