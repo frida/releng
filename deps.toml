@@ -116,6 +116,9 @@ when = "machine.os in {'linux', 'android', 'freebsd', 'qnx'}"
 name = "libdwarf"
 version = "afc1f8dc6f46766e2c377b2b26d1097c73bfda77"
 url = "https://github.com/frida/libdwarf.git"
+options = [
+    "-Ddecompression=false",
+]
 dependencies = [
     { id = "elfutils", when = "machine.os != 'freebsd'" },
 ]
