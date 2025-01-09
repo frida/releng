@@ -257,6 +257,7 @@ CPU_TYPES = {
     "armhf":      "armv7hf",
     "armeabi":    "armv7eabi",
 
+    "aarch64_be": "aarch64",
     "arm64":      "aarch64",
     "arm64e":     "aarch64",
     "arm64eoabi": "aarch64",
