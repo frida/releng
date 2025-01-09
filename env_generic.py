@@ -214,7 +214,7 @@ def init_machine_config(machine: MachineSpec,
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
 
-    if machine.arch == "aarch64_be":
+    if machine.arch == "arm64be":
         common_flags += ["-Wl,-dynamic-linker,/lib64/ld-linux-aarch64_be.so.1"]
 
     constants = config["constants"]
