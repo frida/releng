@@ -240,6 +240,7 @@ CPU_FAMILIES = {
     "armeabi":    "arm",
     "armhf":      "arm",
 
+    "aarch64_be": "aarch64",
     "arm64":      "aarch64",
     "arm64e":     "aarch64",
     "arm64eoabi": "aarch64",
@@ -283,6 +284,7 @@ CPU_TYPES_PER_OS_OVERRIDES = {
 }
 
 BIG_ENDIAN_ARCHS = {
+    "aarch64_be",
     "armbe8",
     "mips",
     "mips64",
@@ -291,4 +293,4 @@ BIG_ENDIAN_ARCHS = {
     "s390x",
 }
 
-TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64|mips\w*|powerpc|s390x)$")
+TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64(_be)?|mips\w*|powerpc|s390x)$")
