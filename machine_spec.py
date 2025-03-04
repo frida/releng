@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import platform
 import re
+import subprocess
 from typing import Optional
 
 
@@ -14,7 +15,22 @@ class MachineSpec:
 
     @staticmethod
     def make_from_local_system() -> MachineSpec:
-        return MachineSpec(detect_os(), detect_arch())
+        os = detect_os()
+        arch = detect_arch()
+        config = None
+
+        if os == "linux":
+            try:
+                output = subprocess.run(["ldd", "--version"],
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT,
+                                        encoding="utf-8").stdout
+                if "musl" in output:
+                    config = "musl"
+            except:
+                pass
+
+        return MachineSpec(os, arch, config)
 
     @staticmethod
     def parse(raw_spec: str) -> MachineSpec:
