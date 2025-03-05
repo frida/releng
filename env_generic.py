@@ -22,7 +22,8 @@ def init_machine_config(machine: MachineSpec,
                         config: ConfigParser,
                         outpath: list[str],
                         outenv: dict[str, str],
-                        outdir: Path):
+                        outdir: Path,
+                        options: dict = {}):
     allow_undefined_symbols = machine.os == "freebsd"
 
     options = config["built-in options"]
