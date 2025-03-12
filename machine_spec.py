@@ -65,6 +65,8 @@ class MachineSpec:
                     arch = "arm64"
                 elif arch == "aarch64_be":
                     arch = "arm64be"
+                elif arch == "aarch64_be_ilp32":
+                    arch = "arm64beilp32"
 
                 if system.startswith("musl"):
                     config = "musl"
@@ -254,31 +256,33 @@ KERNELS = {
 }
 
 CPU_FAMILIES = {
-    "armbe8":     "arm",
-    "armeabi":    "arm",
-    "armhf":      "arm",
+    "armbe8":       "arm",
+    "armeabi":      "arm",
+    "armhf":        "arm",
 
-    "arm64":      "aarch64",
-    "arm64be":    "aarch64",
-    "arm64e":     "aarch64",
-    "arm64eoabi": "aarch64",
+    "arm64":        "aarch64",
+    "arm64be":      "aarch64",
+    "arm64beilp32": "aarch64",
+    "arm64e":       "aarch64",
+    "arm64eoabi":   "aarch64",
 
-    "mipsel":     "mips",
-    "mips64el":   "mips64",
+    "mipsel":       "mips",
+    "mips64el":     "mips64",
 
-    "powerpc":    "ppc"
+    "powerpc":      "ppc"
 }
 
 CPU_TYPES = {
-    "arm":        "armv7",
-    "armbe8":     "armv6",
-    "armhf":      "armv7hf",
-    "armeabi":    "armv7eabi",
+    "arm":              "armv7",
+    "armbe8":           "armv6",
+    "armhf":            "armv7hf",
+    "armeabi":          "armv7eabi",
 
-    "aarch64_be": "aarch64",
-    "arm64":      "aarch64",
-    "arm64e":     "aarch64",
-    "arm64eoabi": "aarch64",
+    "arm64":            "aarch64",
+    "aarch64_be":       "aarch64",
+    "aarch64_be_ilp32": "aarch64",
+    "arm64e":           "aarch64",
+    "arm64eoabi":       "aarch64",
 }
 
 CPU_TYPES_PER_OS_OVERRIDES = {
@@ -304,6 +308,7 @@ CPU_TYPES_PER_OS_OVERRIDES = {
 
 BIG_ENDIAN_ARCHS = {
     "arm64be",
+    "arm64beilp32",
     "armbe8",
     "mips",
     "mips64",
@@ -312,4 +317,4 @@ BIG_ENDIAN_ARCHS = {
     "s390x",
 }
 
-TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64(_be)?|mips\w*|powerpc|s390x)$")
+TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64(_be(_ilp32)?)?|mips\w*|powerpc|s390x)$")
