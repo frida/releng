@@ -216,6 +216,8 @@ def init_machine_config(machine: MachineSpec,
 
     if machine.arch == "arm64be":
         common_flags += ["-Wl,-dynamic-linker,/lib64/ld-linux-aarch64_be.so.1"]
+    elif machine.arch == "arm64beilp32":
+        common_flags += ["-Wl,-dynamic-linker,/libilp32/ld-linux-aarch64_be_ilp32.so.1"]
 
     constants = config["constants"]
     constants["common_flags"] = strv_to_meson(common_flags)
