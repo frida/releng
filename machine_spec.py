@@ -308,7 +308,7 @@ CPU_TYPES_PER_OS_OVERRIDES = {
 
 BIG_ENDIAN_ARCHS = {
     "arm64be",
-    "arm64beilp32"
+    "arm64beilp32",
     "armbe8",
     "mips",
     "mips64",
