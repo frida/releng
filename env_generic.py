@@ -298,13 +298,16 @@ ARCH_COMMON_FLAGS_UNIX = {
     ],
     "arm": [
         "-march=armv5t",
+        "-mthumb",
     ],
     "armbe8": [
         "-march=armv6",
         "-mbe8",
+        "-mthumb",
     ],
     "armhf": [
         "-march=armv7-a",
+        "-mthumb",
     ],
     "arm64": [
         "-march=armv8-a",
@@ -338,10 +341,12 @@ ARCH_COMMON_FLAGS_QNX = {
     "arm": [
         "-march=armv6",
         "-mno-unaligned-access",
+        "-mthumb",
     ],
     "armeabi": [
         "-march=armv7-a",
         "-mno-unaligned-access",
+        "-mthumb",
     ],
 }
 

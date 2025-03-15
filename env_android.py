@@ -133,6 +133,7 @@ ARCH_COMMON_FLAGS = {
         "-march=armv7-a",
         "-mfloat-abi=softfp",
         "-mfpu=vfpv3-d16",
+        "-mthumb",
     ]
 }
 
