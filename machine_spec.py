@@ -57,7 +57,7 @@ class MachineSpec:
                 if arch[0] == "i":
                     arch = "x86"
                 elif arch == "arm":
-                    if system == "gnueabihf":
+                    if system.endswith("eabihf"):
                         arch = "armhf"
                     elif os == "qnx" and system.endswith("eabi"):
                         arch = "armeabi"
