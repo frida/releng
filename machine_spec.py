@@ -65,8 +65,8 @@ class MachineSpec:
                     arch = "arm64"
                 elif arch == "aarch64_be":
                     arch = "arm64be"
-                elif arch == "aarch64_be_ilp32":
-                    arch = "arm64beilp32"
+                if system.endswith("_ilp32"):
+                    arch += "ilp32"
 
                 if system.startswith("musl"):
                     config = "musl"
@@ -204,7 +204,7 @@ class MachineSpec:
         arch = self.arch
         if arch in {"x86_64", "s390x"}:
             return 8
-        if arch.startswith("arm64") or arch.startswith("mips64"):
+        if (arch.startswith("arm64") and not arch.endswith("ilp32")) or arch.startswith("mips64"):
             return 8
         return 4
 
@@ -273,16 +273,16 @@ CPU_FAMILIES = {
 }
 
 CPU_TYPES = {
-    "arm":              "armv7",
-    "armbe8":           "armv6",
-    "armhf":            "armv7hf",
-    "armeabi":          "armv7eabi",
+    "arm":          "armv7",
+    "armbe8":       "armv6",
+    "armhf":        "armv7hf",
+    "armeabi":      "armv7eabi",
 
-    "arm64":            "aarch64",
-    "aarch64_be":       "aarch64",
-    "aarch64_be_ilp32": "aarch64",
-    "arm64e":           "aarch64",
-    "arm64eoabi":       "aarch64",
+    "arm64":        "aarch64",
+    "arm64be":      "aarch64",
+    "arm64beilp32": "aarch64",
+    "arm64e":       "aarch64",
+    "arm64eoabi":   "aarch64",
 }
 
 CPU_TYPES_PER_OS_OVERRIDES = {
@@ -317,4 +317,4 @@ BIG_ENDIAN_ARCHS = {
     "s390x",
 }
 
-TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64(_be(_ilp32)?)?|mips\w*|powerpc|s390x)$")
+TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64(_be)?|mips\w*|powerpc|s390x)$")
