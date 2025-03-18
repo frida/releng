@@ -282,6 +282,9 @@ def can_run_host_binaries(build_machine: MachineSpec,
 
 def find_exe_wrapper(machine: MachineSpec,
                      environ: dict[str, str]) -> Optional[list[str]]:
+    if machine.arch == "arm64beilp32":
+        return None
+
     qemu_sysroot = environ.get("FRIDA_QEMU_SYSROOT")
     if qemu_sysroot is None:
         return None
