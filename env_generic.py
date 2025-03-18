@@ -301,8 +301,7 @@ ARCH_COMMON_FLAGS_UNIX = {
         "-mthumb",
     ],
     "armbe8": [
-        "-march=armv6",
-        "-mbe8",
+        "-mcpu=cortex-a72",
         "-mthumb",
     ],
     "armhf": [
