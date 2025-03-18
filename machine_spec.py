@@ -61,6 +61,8 @@ class MachineSpec:
                         arch = "armhf"
                     elif os == "qnx" and system.endswith("eabi"):
                         arch = "armeabi"
+                elif arch == "armeb":
+                    arch = "armbe8"
                 elif arch == "aarch64":
                     arch = "arm64"
                 elif arch == "aarch64_be":
