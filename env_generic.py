@@ -335,12 +335,10 @@ ARCH_COMMON_FLAGS_QNX = {
     "arm": [
         "-march=armv6",
         "-mno-unaligned-access",
-        "-mthumb",
     ],
     "armeabi": [
         "-march=armv7-a",
         "-mno-unaligned-access",
-        "-mthumb",
     ],
 }
 
