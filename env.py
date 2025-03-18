@@ -418,5 +418,4 @@ QEMU_ARCHS = {
     "armbe8": "armeb",
     "arm64": "aarch64",
     "arm64be": "aarch64_be",
-    "arm64beilp32": "aarch64_be",
 }
