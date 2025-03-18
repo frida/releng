@@ -362,6 +362,7 @@ options = [
 [v8]
 when = """ \
        machine.config != 'mingw' \
+       and machine.arch != 'arm64beilp32' \
        and not machine.arch.startswith('mips') \
        and not machine.arch.startswith('powerpc') \
        and machine.os != 'qnx' \
