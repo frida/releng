@@ -3,13 +3,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-typedef struct _ExampleListener ExampleListener;
+typedef struct _ExampleListenerData ExampleListenerData;
 typedef enum _ExampleHookId ExampleHookId;
 
-struct _ExampleListener
+struct _ExampleListenerData
 {
-  GObject parent;
-
   guint num_calls;
 };
 
@@ -19,51 +17,48 @@ enum _ExampleHookId
   EXAMPLE_HOOK_CLOSE
 };
 
-static void example_listener_iface_init (gpointer g_iface, gpointer iface_data);
-
-#define EXAMPLE_TYPE_LISTENER (example_listener_get_type ())
-G_DECLARE_FINAL_TYPE (ExampleListener, example_listener, EXAMPLE, LISTENER, GObject)
-G_DEFINE_TYPE_EXTENDED (ExampleListener,
-                        example_listener,
-                        G_TYPE_OBJECT,
-                        0,
-                        G_IMPLEMENT_INTERFACE (GUM_TYPE_INVOCATION_LISTENER,
-                            example_listener_iface_init))
+static void example_listener_on_enter (GumInvocationContext * ic, gpointer user_data);
+static void example_listener_on_leave (GumInvocationContext * ic, gpointer user_data);
 
 int
 main (int argc,
       char * argv[])
 {
   GumInterceptor * interceptor;
+  ExampleListenerData * data;
   GumInvocationListener * listener;
 
   gum_init_embedded ();
 
   interceptor = gum_interceptor_obtain ();
-  listener = g_object_new (EXAMPLE_TYPE_LISTENER, NULL);
+
+  data = g_new0 (ExampleListenerData, 1);
+  listener = gum_make_call_listener (example_listener_on_enter, example_listener_on_leave, data, g_free);
 
   gum_interceptor_begin_transaction (interceptor);
   gum_interceptor_attach (interceptor,
-      GSIZE_TO_POINTER (gum_module_find_export_by_name (NULL, "open")),
+      GSIZE_TO_POINTER (gum_module_find_global_export_by_name ("open")),
       listener,
-      GSIZE_TO_POINTER (EXAMPLE_HOOK_OPEN));
+      GSIZE_TO_POINTER (EXAMPLE_HOOK_OPEN),
+      GUM_ATTACH_FLAGS_NONE);
   gum_interceptor_attach (interceptor,
-      GSIZE_TO_POINTER (gum_module_find_export_by_name (NULL, "close")),
+      GSIZE_TO_POINTER (gum_module_find_global_export_by_name ("close")),
       listener,
-      GSIZE_TO_POINTER (EXAMPLE_HOOK_CLOSE));
+      GSIZE_TO_POINTER (EXAMPLE_HOOK_CLOSE),
+      GUM_ATTACH_FLAGS_NONE);
   gum_interceptor_end_transaction (interceptor);
 
   close (open ("/etc/hosts", O_RDONLY));
   close (open ("/etc/fstab", O_RDONLY));
 
-  g_print ("[*] listener got %u calls\n", EXAMPLE_LISTENER (listener)->num_calls);
+  g_print ("[*] listener got %u calls\n", data->num_calls);
 
   gum_interceptor_detach (interceptor, listener);
 
   close (open ("/etc/hosts", O_RDONLY));
   close (open ("/etc/fstab", O_RDONLY));
 
-  g_print ("[*] listener still has %u calls\n", EXAMPLE_LISTENER (listener)->num_calls);
+  g_print ("[*] listener still has %u calls\n", data->num_calls);
 
   g_object_unref (listener);
   g_object_unref (interceptor);
@@ -74,11 +69,13 @@ main (int argc,
 }
 
 static void
-example_listener_on_enter (GumInvocationListener * listener,
-                           GumInvocationContext * ic)
+example_listener_on_enter (GumInvocationContext * ic,
+                           gpointer user_data)
 {
-  ExampleListener * self = EXAMPLE_LISTENER (listener);
-  ExampleHookId hook_id = GUM_IC_GET_FUNC_DATA (ic, ExampleHookId);
+  ExampleListenerData * data = user_data;
+  ExampleHookId hook_id;
+
+  hook_id = GUM_IC_GET_FUNC_DATA (ic, ExampleHookId);
 
   switch (hook_id)
   {
@@ -90,33 +87,11 @@ example_listener_on_enter (GumInvocationListener * listener,
       break;
   }
 
-  self->num_calls++;
+  data->num_calls++;
 }
 
 static void
-example_listener_on_leave (GumInvocationListener * listener,
-                           GumInvocationContext * ic)
-{
-}
-
-static void
-example_listener_class_init (ExampleListenerClass * klass)
-{
-  (void) EXAMPLE_IS_LISTENER;
-  (void) glib_autoptr_cleanup_ExampleListener;
-}
-
-static void
-example_listener_iface_init (gpointer g_iface,
-                             gpointer iface_data)
-{
-  GumInvocationListenerInterface * iface = g_iface;
-
-  iface->on_enter = example_listener_on_enter;
-  iface->on_leave = example_listener_on_leave;
-}
-
-static void
-example_listener_init (ExampleListener * self)
+example_listener_on_leave (GumInvocationContext * ic,
+                           gpointer user_data)
 {
 }
