@@ -139,7 +139,7 @@ class CompilerApplication:
             ingest_header(selinux_header, header_files, processed_header_files, devkit_header_lines)
         devkit_header = u"".join(devkit_header_lines)
 
-        if package.startswith("frida-gumjs"):
+        if package.startswith("frida-gum"):
             config = """#ifndef GUM_STATIC
 # define GUM_STATIC
 #endif
