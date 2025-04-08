@@ -303,6 +303,10 @@ ARCH_COMMON_FLAGS_UNIX = {
         "-march=armv7-a",
         "-mthumb",
     ],
+    "armv6kz": [
+        "-march=armv6kz",
+        "-mcpu=arm1176jzf-s",
+    ],
     "arm64": [
         "-march=armv8-a",
     ],

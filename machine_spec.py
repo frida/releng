@@ -261,6 +261,7 @@ CPU_FAMILIES = {
     "armbe8":       "arm",
     "armeabi":      "arm",
     "armhf":        "arm",
+    "armv6kz":      "arm",
 
     "arm64":        "aarch64",
     "arm64be":      "aarch64",
@@ -279,6 +280,7 @@ CPU_TYPES = {
     "armbe8":       "armv6",
     "armhf":        "armv7hf",
     "armeabi":      "armv7eabi",
+    "armv6kz":      "armv6",
 
     "arm64":        "aarch64",
     "arm64be":      "aarch64",
@@ -292,6 +294,7 @@ CPU_TYPES_PER_OS_OVERRIDES = {
         "arm":        "armv5t",
         "armbe8":     "armv6t",
         "armhf":      "armv7a",
+        "armv6kz":    "armv6t",
 
         "mips":       "mips1",
         "mipsel":     "mips1",
