@@ -7,6 +7,7 @@ import subprocess
 from typing import Optional
 if platform.system() == "Windows":
     import winreg
+import sys
 
 from .machine_spec import MachineSpec
 
@@ -44,12 +45,35 @@ def detect_msvs_installation_dir(toolchain_prefix: Optional[Path]) -> Path:
 
 def detect_msvc_tool_dir(toolchain_prefix: Optional[Path]) -> Path:
     global cached_msvc_dir
+    print(f"cached_msvc_dir: {cached_msvc_dir}")
     if cached_msvc_dir is None:
         msvs_dir = detect_msvs_installation_dir(toolchain_prefix)
-        version = sorted((msvs_dir / "VC" / "Tools" / "MSVC").glob("*.*.*"),
-                         key=attrgetter("name"),
-                         reverse=True)[0].name
-        cached_msvc_dir = msvs_dir / "VC" / "Tools" / "MSVC" / version
+        # version = sorted((msvs_dir / "VC" / "Tools" / "MSVC").glob("*.*.*"),
+        #             key=attrgetter("name"),
+        #             reverse=True)[0].name
+        # cached_msvc_dir = msvs_dir / "VC" / "Tools" / "MSVC" / version
+        msvc_tools_base_dir = msvs_dir / "VC" / "Tools" / "MSVC"
+        
+        found_versions = list(msvc_tools_base_dir.glob("*.*.*"))
+        
+        if not found_versions:
+            error_message = (
+                f"\n[Frida Build Error]\n"
+                f"Failed to find MSVC C++ build tools in the expected directory:\n"
+                f"{msvc_tools_base_dir}\n\n"
+                f"This usually means the 'Desktop development with C++' workload is not installed\n"
+                f"or incomplete in your Visual Studio installation.\n\n"
+                f"Please run the Visual Studio Installer, modify your installation,\n"
+                f"and ensure the 'Desktop development with C++' workload is selected,\n"
+                f"including the latest MSVC v14x build tools components.\n"
+            )
+            print(error_message, file=sys.stderr, flush=True)
+            raise MissingDependencyError("MSVC C++ build tools not found.")
+
+        version_path = sorted(found_versions,
+                              key=attrgetter("name"),
+                              reverse=True)[0]
+        cached_msvc_dir = version_path
     return cached_msvc_dir
 
 
@@ -68,7 +92,7 @@ def detect_windows_sdk() -> tuple[Path, str]:
             finally:
                 winreg.CloseKey(key)
         except Exception as e:
-            raise MissingDependencyError("Windows 10 SDK is not installed")
+            raise MissingDependencyError("Windows SDK is not installed")
     return cached_winsdk
 
 
