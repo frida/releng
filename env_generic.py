@@ -301,6 +301,8 @@ ARCH_COMMON_FLAGS_UNIX = {
     ],
     "armhf": [
         "-march=armv7-a",
+        "-mtune=cortex-a7",
+        "-mfpu=neon-vfpv4",
         "-mthumb",
     ],
     "arm64": [
