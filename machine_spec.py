@@ -5,6 +5,10 @@ import re
 import subprocess
 from typing import Optional
 
+if platform.system() == "Windows":
+    import ctypes
+    from ctypes import wintypes
+
 
 @dataclass
 class MachineSpec:
@@ -236,8 +240,78 @@ def detect_os() -> str:
 
 
 def detect_arch() -> str:
+    if platform.system() == "Windows":
+        return detect_arch_windows()
     arch = platform.machine().lower()
     return ARCHS.get(arch, arch)
+
+def detect_arch_windows():
+    try:
+        code = detect_arch_windows_modern()
+    except AttributeError:
+        code = detect_arch_windows_legacy()
+    if code == PROCESSOR_ARCHITECTURE_INTEL:
+        return "x86"
+    elif code in {PROCESSOR_ARCHITECTURE_AMD64, IMAGE_FILE_MACHINE_AMD64}:
+        return "x86_64"
+    elif code in {PROCESSOR_ARCHITECTURE_ARM64, IMAGE_FILE_MACHINE_ARM64}:
+        return "arm64"
+    else:
+        raise RuntimeError(f"unrecognized native architecture code: {code!r}")
+
+def detect_arch_windows_modern():
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    try:
+        is_wow64_process = kernel32.IsWow64Process2
+    except AttributeError:
+        raise
+
+    is_wow64_process.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.WORD),
+        ctypes.POINTER(wintypes.WORD),
+    )
+    is_wow64_process.restype = wintypes.BOOL
+
+    process_machine = wintypes.WORD(0)
+    native_machine  = wintypes.WORD(0)
+
+    ok = is_wow64_process(
+        kernel32.GetCurrentProcess(),
+        ctypes.byref(process_machine),
+        ctypes.byref(native_machine)
+    )
+    if not ok:
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    return native_machine.value
+
+def detect_arch_windows_legacy():
+    class SYSTEM_INFO(ctypes.Structure):
+        _fields_ = [
+            ("wProcessorArchitecture",      wintypes.WORD),
+            ("wReserved",                   wintypes.WORD),
+            ("dwPageSize",                  wintypes.DWORD),
+            ("lpMinimumApplicationAddress", ctypes.c_void_p),
+            ("lpMaximumApplicationAddress", ctypes.c_void_p),
+            ("dwActiveProcessorMask",       ctypes.c_void_p),
+            ("dwNumberOfProcessors",        wintypes.DWORD),
+            ("dwProcessorType",             wintypes.DWORD),
+            ("dwAllocationGranularity",     wintypes.DWORD),
+            ("wProcessorLevel",             wintypes.WORD),
+            ("wProcessorRevision",          wintypes.WORD),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    get_native_system_info = kernel32.GetNativeSystemInfo
+    get_native_system_info.argtypes = (ctypes.POINTER(SYSTEM_INFO),)
+    get_native_system_info.restype = None
+
+    info = SYSTEM_INFO()
+    get_native_system_info(ctypes.byref(info))
+    return info.wProcessorArchitecture
 
 
 ARCHS = {
@@ -320,3 +394,10 @@ BIG_ENDIAN_ARCHS = {
 }
 
 TARGET_TRIPLET_ARCH_PATTERN = re.compile(r"^(i.86|x86_64|arm\w*|aarch64(_be)?|mips\w*|powerpc|s390x)$")
+
+PROCESSOR_ARCHITECTURE_INTEL = 0
+PROCESSOR_ARCHITECTURE_AMD64 = 9
+PROCESSOR_ARCHITECTURE_ARM64 = 12
+
+IMAGE_FILE_MACHINE_AMD64 = 0x8664
+IMAGE_FILE_MACHINE_ARM64 = 0xAA64
