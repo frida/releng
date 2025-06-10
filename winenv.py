@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import platform
 import subprocess
-from typing import Optional
+from typing import List, Optional, Tuple
 if platform.system() == "Windows":
     import winreg
 
@@ -53,7 +53,7 @@ def detect_msvc_tool_dir(toolchain_prefix: Optional[Path]) -> Path:
     return cached_msvc_dir
 
 
-def detect_windows_sdk() -> tuple[Path, str]:
+def detect_windows_sdk() -> Tuple[Path, str]:
     global cached_winsdk
     if cached_winsdk is None:
         try:
@@ -82,7 +82,7 @@ def detect_msvs_tool_path(machine: MachineSpec,
 
 def detect_msvs_runtime_path(machine: MachineSpec,
                              build_machine: MachineSpec,
-                             toolchain_prefix: Optional[Path]) -> list[Path]:
+                             toolchain_prefix: Optional[Path]) -> List[Path]:
     msvc_platform = machine.msvc_platform
     native_msvc_platform = build_machine.msvc_platform
 
@@ -99,7 +99,7 @@ def detect_msvs_runtime_path(machine: MachineSpec,
     return [winsdk_bindir, msvc_bindir] + msvc_dll_dirs
 
 
-def detect_msvs_include_path(toolchain_prefix: Optional[Path]) -> list[Path]:
+def detect_msvs_include_path(toolchain_prefix: Optional[Path]) -> List[Path]:
     msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
     vc_dir = detect_msvs_installation_dir(toolchain_prefix) / "VC"
 
@@ -118,7 +118,7 @@ def detect_msvs_include_path(toolchain_prefix: Optional[Path]) -> list[Path]:
 
 
 def detect_msvs_library_path(machine: MachineSpec,
-                             toolchain_prefix: Optional[Path]) -> list[Path]:
+                             toolchain_prefix: Optional[Path]) -> List[Path]:
     msvc_platform = machine.msvc_platform
 
     msvc_dir = detect_msvc_tool_dir(toolchain_prefix)

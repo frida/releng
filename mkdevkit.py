@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 import subprocess
 import sys
-from typing import Optional
+from typing import Dict, List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -13,8 +13,8 @@ from releng import devkit, env, machine_spec
 
 
 def main():
-    raw_args: list[str] = []
-    ool_optvals: dict[str, list[str]] = {}
+    raw_args: List[str] = []
+    ool_optvals: Dict[str, List[str]] = {}
     pending_raw_args = sys.argv[1:]
     while len(pending_raw_args) > 0:
         cur = pending_raw_args.pop(0)
@@ -93,7 +93,7 @@ def main():
         sys.exit(1)
 
 
-def parse_array_option_value(val: str, ool_optvals: dict[str, list[str]]) -> Optional[list[str]]:
+def parse_array_option_value(val: str, ool_optvals: Dict[str, List[str]]) -> Optional[List[str]]:
     if val == "":
         return None
     if val.startswith("ool:"):

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import List
 
 
 RELENG_DIR = Path(__file__).resolve().parent
@@ -22,7 +23,7 @@ class FridaVersion:
     commit: str
 
 
-def main(argv: list[str]):
+def main(argv: List[str]):
     parser = argparse.ArgumentParser()
     parser.add_argument("repo", nargs="?", type=Path, default=ROOT_DIR)
     args = parser.parse_args()

@@ -2,7 +2,7 @@ from configparser import ConfigParser
 from pathlib import Path
 import shlex
 import subprocess
-from typing import Callable, Optional
+from typing import Callable, Dict, List, Optional
 
 from .machine_file import strv_to_meson
 from .machine_spec import MachineSpec
@@ -11,13 +11,13 @@ from .machine_spec import MachineSpec
 def init_machine_config(machine: MachineSpec,
                         build_machine: MachineSpec,
                         is_cross_build: bool,
-                        environ: dict[str, str],
+                        environ: Dict[str, str],
                         toolchain_prefix: Optional[Path],
                         sdk_prefix: Optional[Path],
                         call_selected_meson: Callable,
                         config: ConfigParser,
-                        outpath: list[str],
-                        outenv: dict[str, str],
+                        outpath: List[str],
+                        outenv: Dict[str, str],
                         outdir: Path):
     xcenv = {**environ}
     if machine.arch == "arm64eoabi":
