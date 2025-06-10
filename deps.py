@@ -19,7 +19,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from typing import Callable, Iterator, Optional, Mapping, Sequence, Union
+from typing import Callable, Dict, Iterator, List, Optional, Mapping, Sequence, Set, Tuple, Union
 import urllib.request
 
 RELENG_DIR = Path(__file__).resolve().parent
@@ -107,7 +107,7 @@ def parse_bundle_option_value(raw_bundle: str) -> Bundle:
         raise argparse.ArgumentTypeError(f"invalid choice: {raw_bundle} (choose from '{choices}')")
 
 
-def parse_set_option_value(v: str) -> set[str]:
+def parse_set_option_value(v: str) -> Set[str]:
     return set([v.strip() for v in v.split(",")])
 
 
@@ -123,7 +123,7 @@ def query_toolchain_prefix(machine: MachineSpec,
 def ensure_toolchain(machine: MachineSpec,
                      cache_dir: Path,
                      version: Optional[str] = None,
-                     on_progress: ProgressCallback = print_progress) -> tuple[Path, SourceState]:
+                     on_progress: ProgressCallback = print_progress) -> Tuple[Path, SourceState]:
     toolchain_prefix = query_toolchain_prefix(machine, cache_dir)
     state = sync(Bundle.TOOLCHAIN, machine, toolchain_prefix, version, on_progress)
     return (toolchain_prefix, state)
@@ -137,7 +137,7 @@ def query_sdk_prefix(machine: MachineSpec,
 def ensure_sdk(machine: MachineSpec,
                cache_dir: Path,
                version: Optional[str] = None,
-               on_progress: ProgressCallback = print_progress) -> tuple[Path, SourceState]:
+               on_progress: ProgressCallback = print_progress) -> Tuple[Path, SourceState]:
     sdk_prefix = query_sdk_prefix(machine, cache_dir)
     state = sync(Bundle.SDK, machine, sdk_prefix, version, on_progress)
     return (sdk_prefix, state)
@@ -283,8 +283,8 @@ def roll(bundle: Bundle,
 def build(bundle: Bundle,
           build_machine: MachineSpec,
           host_machine: MachineSpec,
-          only_packages: Optional[set[str]] = None,
-          excluded_packages: set[str] = set(),
+          only_packages: Optional[Set[str]] = None,
+          excluded_packages: Set[str] = set(),
           verbose: bool = False) -> Path:
     builder = Builder(bundle, build_machine, host_machine, verbose)
     try:
@@ -317,15 +317,15 @@ class Builder:
         self._toolchain_prefix: Optional[Path] = None
         self._build_config: Optional[env.MachineConfig] = None
         self._host_config: Optional[env.MachineConfig] = None
-        self._build_env: dict[str, str] = {}
-        self._host_env: dict[str, str] = {}
+        self._build_env: Dict[str, str] = {}
+        self._host_env: Dict[str, str] = {}
 
         self._ansi_supported = os.environ.get("TERM") != "dumb" \
                     and (self._build_machine.os != "windows" or "WT_SESSION" in os.environ)
 
     def build(self,
-              only_packages: Optional[list[str]],
-              excluded_packages: set[str]) -> Path:
+              only_packages: Optional[List[str]],
+              excluded_packages: Set[str]) -> Path:
         started_at = time.time()
         prepare_ended_at = None
         clone_time_elapsed = None
@@ -407,7 +407,7 @@ class Builder:
 
     def _resolve_dependencies(self,
                               packages: Sequence[PackageSpec],
-                              all_packages: Mapping[str, PackageSpec]) -> dict[str, PackageSpec]:
+                              all_packages: Mapping[str, PackageSpec]) -> Dict[str, PackageSpec]:
         result = {p.identifier: p for p in packages}
         for p in packages:
             self._resolve_package_dependencies(p, all_packages, result)
@@ -627,7 +627,7 @@ class Builder:
 
         return outfile
 
-    def _stage_toolchain_files(self, location: Path) -> list[Path]:
+    def _stage_toolchain_files(self, location: Path) -> List[Path]:
         if self._host_machine.os == "windows":
             toolchain_prefix = self._toolchain_prefix
             mixin_files = [f for f in self._walk_plain_files(toolchain_prefix)
@@ -639,7 +639,7 @@ class Builder:
                  if self._file_is_toolchain_related(f)]
         copy_files(prefix, files, location)
 
-    def _stage_sdk_files(self, location: Path) -> list[Path]:
+    def _stage_sdk_files(self, location: Path) -> List[Path]:
         prefix = self._get_prefix(self._host_machine)
         files = [f for f in self._walk_plain_files(prefix)
                  if self._file_is_sdk_related(f)]
@@ -846,7 +846,7 @@ def wait(bundle: Bundle, machine: MachineSpec):
 
 
 def bump():
-    def run(argv: list[str], **kwargs) -> subprocess.CompletedProcess:
+    def run(argv: List[str], **kwargs) -> subprocess.CompletedProcess:
         return subprocess.run(argv,
                               capture_output=True,
                               encoding="utf-8",
@@ -901,7 +901,7 @@ def bump_wraps(identifier: str,
         print(f"\tno relevant wraps, only: {', '.join([blob['path'] for blob, _ in all_wraps])}")
         return
 
-    pending_wraps: list[tuple[str, str, PackageSpec]] = []
+    pending_wraps: List[Tuple[str, str, PackageSpec]] = []
     for blob, spec in relevant_wraps:
         filename = blob["path"]
 
@@ -965,7 +965,7 @@ def identifier_from_wrap_filename(filename: str) -> str:
 
 def compute_bundle_parameters(bundle: Bundle,
                               machine: MachineSpec,
-                              version: str) -> tuple[str, str]:
+                              version: str) -> Tuple[str, str]:
     if bundle == Bundle.TOOLCHAIN and machine.os == "windows":
         os_arch_config = "windows-x86" if machine.arch in {"x86", "x86_64"} else machine.os_dash_arch
     else:
@@ -1061,7 +1061,7 @@ def parse_dependency(v: Union[str, dict]) -> OptionSpec:
 
 
 def copy_files(fromdir: Path,
-               files: list[Path],
+               files: List[Path],
                todir: Path):
     for filename in files:
         src = fromdir / filename
@@ -1103,7 +1103,7 @@ class SourceState(Enum):
 class DependencyParameters:
     deps_version: str
     bootstrap_version: str
-    packages: dict[str, PackageSpec]
+    packages: Dict[str, PackageSpec]
 
 
 @dataclass
@@ -1112,8 +1112,8 @@ class PackageSpec:
     name: str
     version: str
     url: str
-    options: list[OptionSpec] = field(default_factory=list)
-    dependencies: list[DependencySpec] = field(default_factory=list)
+    options: List[OptionSpec] = field(default_factory=list)
+    dependencies: List[DependencySpec] = field(default_factory=list)
     scope: Optional[str] = None
     when: Optional[str] = None
 
