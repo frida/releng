@@ -201,10 +201,9 @@ def init_machine_config(machine: MachineSpec,
         if linker_flavor.startswith("gnu-"):
             linker_flags += ["-static-libgcc"]
             if machine.os != "windows":
-                linker_flags += [
-                    "-Wl,-z,relro",
-                    "-Wl,-z,noexecstack",
-                ]
+                linker_flags += ["-Wl,-z,noexecstack"]
+            if machine.os != "none":
+                linker_flags += ["-Wl,-z,relro"]
             cxx_link_flags += ["-static-libstdc++"]
 
         if linker_flavor == "apple":
@@ -213,6 +212,9 @@ def init_machine_config(machine: MachineSpec,
             linker_flags += ["-Wl,--gc-sections"]
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
+
+        if machine.os == "none":
+            linker_flags += ["-specs=nosys.specs"]
 
     constants = config["constants"]
     constants["common_flags"] = strv_to_meson(common_flags)
