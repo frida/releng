@@ -329,7 +329,7 @@ options = [
 
 [quickjs]
 name = "QuickJS"
-version = "12de2e4904b63405052508c891b215d056962c18"
+version = "0f843944de82b04146fdcab85b088d2000ae5e68"
 url = "https://github.com/frida/quickjs.git"
 options = [
     "-Dlibc=false",
