@@ -87,7 +87,7 @@ options = [
     { value = "-Dglib_checks=false", when = "machine.config_is_optimized" },
     { value = "-Diconv=external", when = """ \
                                          machine.is_apple \
-                                         or machine.os in {'android', 'qnx'} \
+                                         or machine.os in {'android', 'qnx', 'none'} \
                                          or machine.config == 'uclibc' \
                                          """ }
 ]
