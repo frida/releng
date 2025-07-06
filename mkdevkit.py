@@ -66,7 +66,7 @@ def main():
     for name in machine_options.keys():
         pretty_name = name.replace("_", "-")
         parser.add_argument("--" + pretty_name,
-                            help=f"The {pretty_name} to use",
+                            help=f"the {pretty_name} to use",
                             type=lambda v: parse_array_option_value(v, ool_optvals))
 
     options = parser.parse_args(raw_args)
