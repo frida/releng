@@ -35,7 +35,8 @@ def main():
     builddir = Path(os.environ.get("MESON_BUILD_ROOT", default_builddir)).resolve()
 
     parser = argparse.ArgumentParser(prog="configure",
-                                     add_help=False)
+                                     add_help=False,
+                                     formatter_class=argparse.RawTextHelpFormatter)
     opts = parser.add_argument_group(title="generic options")
     opts.add_argument("-h", "--help",
                       help="show this help message and exit",
