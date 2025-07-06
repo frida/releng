@@ -307,6 +307,10 @@ ARCH_COMMON_FLAGS_UNIX = {
         "-mfpu=neon-vfpv4",
         "-mthumb",
     ],
+    "armv6kz": [
+        "-march=armv6kz",
+        "-mcpu=arm1176jzf-s",
+    ],
     "arm64": [
         "-march=armv8-a",
     ],
