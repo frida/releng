@@ -139,7 +139,13 @@ class CompilerApplication:
         umbrella_header = header_files[0]
         processed_header_files = {umbrella_header}
         ingest_header(umbrella_header, header_files, processed_header_files, devkit_header_lines)
-        if kit == "frida-gumjs":
+        if kit in {"frida-gum", "frida-gumjs"} and machine.os == "none":
+            gum_dir = umbrella_header_path.parent
+            if kit == "frida-gumjs":
+                gum_dir = gum_dir.parent.parent / "gum"
+            barebone_header = gum_dir / "backend-barebone" / "include" / "gum" / "gumbarebone.h"
+            ingest_header(barebone_header, header_files, processed_header_files, devkit_header_lines)
+        if kit == "frida-gumjs" and machine.os != "none":
             inspector_server_header = umbrella_header_path.parent / "guminspectorserver.h"
             ingest_header(inspector_server_header, header_files, processed_header_files, devkit_header_lines)
         if kit == "frida-core" and machine.os == "android":
