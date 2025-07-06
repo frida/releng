@@ -9,7 +9,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import Callable, Literal, Optional
+from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 from . import env_android, env_apple, env_generic, machine_file
 from .machine_file import bool_to_meson, str_to_meson, strv_to_meson
@@ -19,10 +19,10 @@ from .machine_spec import MachineSpec
 @dataclass
 class MachineConfig:
     machine_file: Path
-    binpath: list[Path]
-    environ: dict[str, str]
+    binpath: List[Path]
+    environ: Dict[str, str]
 
-    def make_merged_environment(self, source_environ: dict[str, str]) -> dict[str, str]:
+    def make_merged_environment(self, source_environ: Dict[str, str]) -> Dict[str, str]:
         menv = {**source_environ}
         menv.update(self.environ)
 
@@ -63,13 +63,13 @@ def detect_default_prefix() -> Path:
 
 def generate_machine_configs(build_machine: MachineSpec,
                              host_machine: MachineSpec,
-                             environ: dict[str, str],
+                             environ: Dict[str, str],
                              toolchain_prefix: Optional[Path],
                              build_sdk_prefix: Optional[Path],
                              host_sdk_prefix: Optional[Path],
                              call_selected_meson: Callable,
                              default_library: DefaultLibrary,
-                             outdir: Path) -> tuple[MachineConfig, MachineConfig]:
+                             outdir: Path) -> Tuple[MachineConfig, MachineConfig]:
     is_cross_build = host_machine != build_machine
 
     if is_cross_build:
@@ -107,7 +107,7 @@ def generate_machine_configs(build_machine: MachineSpec,
 def generate_machine_config(machine: MachineSpec,
                             build_machine: MachineSpec,
                             is_cross_build: bool,
-                            environ: dict[str, str],
+                            environ: Dict[str, str],
                             toolchain_prefix: Optional[Path],
                             sdk_prefix: Optional[Path],
                             call_selected_meson: Callable,
@@ -249,13 +249,13 @@ def generate_machine_config(machine: MachineSpec,
 
 def needs_exe_wrapper(build_machine: MachineSpec,
                       host_machine: MachineSpec,
-                      environ: dict[str, str]) -> bool:
+                      environ: Dict[str, str]) -> bool:
     return not can_run_host_binaries(build_machine, host_machine, environ)
 
 
 def can_run_host_binaries(build_machine: MachineSpec,
                           host_machine: MachineSpec,
-                          environ: dict[str, str]) -> bool:
+                          environ: Dict[str, str]) -> bool:
     if host_machine == build_machine:
         return True
 
@@ -281,7 +281,7 @@ def can_run_host_binaries(build_machine: MachineSpec,
 
 
 def find_exe_wrapper(machine: MachineSpec,
-                     environ: dict[str, str]) -> Optional[list[str]]:
+                     environ: Dict[str, str]) -> Optional[List[str]]:
     if machine.arch == "arm64beilp32":
         return None
 
@@ -297,7 +297,7 @@ def find_exe_wrapper(machine: MachineSpec,
     return [qemu_binary, "-L", qemu_sysroot]
 
 
-def make_pkg_config_wrapper(pkg_config: list[str], pkg_config_path: list[str]) -> str:
+def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str]) -> str:
     return "\n".join([
         "import os",
         "import subprocess",
@@ -317,7 +317,7 @@ def make_pkg_config_wrapper(pkg_config: list[str], pkg_config_path: list[str]) -
 
 
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
-                                   build_machine: MachineSpec) -> Optional[tuple[Path, Path]]:
+                                   build_machine: MachineSpec) -> Optional[Tuple[Path, Path]]:
     datadir = next((toolchain_prefix / "share").glob("vala-*"), None)
     if datadir is None:
         return None

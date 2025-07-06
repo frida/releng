@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from typing import Callable, Optional, Mapping, Sequence
+from typing import Callable, Dict, List, Optional, Mapping, Sequence, Tuple
 
 from . import winenv
 from .machine_file import strv_to_meson
@@ -15,13 +15,13 @@ from .machine_spec import MachineSpec
 def init_machine_config(machine: MachineSpec,
                         build_machine: MachineSpec,
                         is_cross_build: bool,
-                        environ: dict[str, str],
+                        environ: Dict[str, str],
                         toolchain_prefix: Optional[Path],
                         sdk_prefix: Optional[Path],
                         call_selected_meson: Callable,
                         config: ConfigParser,
-                        outpath: list[str],
-                        outenv: dict[str, str],
+                        outpath: List[str],
+                        outenv: Dict[str, str],
                         outdir: Path):
     allow_undefined_symbols = machine.os == "freebsd"
 
@@ -224,7 +224,7 @@ def init_machine_config(machine: MachineSpec,
     constants["cxx_link_flags"] = strv_to_meson(cxx_link_flags)
 
 
-def resolve_gcc_binaries(toolprefix: str = "") -> tuple[list[str], dict[str, str]]:
+def resolve_gcc_binaries(toolprefix: str = "") -> Tuple[List[str], Dict[str, str]]:
     cc = None
     binaries = OrderedDict()
 
@@ -257,7 +257,7 @@ def resolve_gcc_binaries(toolprefix: str = "") -> tuple[list[str], dict[str, str
     return (cc, binaries)
 
 
-def detect_linker_flavor(cc: list[str]) -> str:
+def detect_linker_flavor(cc: List[str]) -> str:
     linker_version = subprocess.run(cc + ["-Wl,--version"],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT,

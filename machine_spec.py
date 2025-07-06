@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import platform
 import re
 import subprocess
-from typing import Optional
+from typing import List, Optional
 
 if platform.system() == "Windows":
     import ctypes
@@ -145,7 +145,7 @@ class MachineSpec:
         return True
 
     @property
-    def meson_optimization_options(self) -> list[str]:
+    def meson_optimization_options(self) -> List[str]:
         if self.config_is_optimized:
             optimization = "s"
             ndebug = "true"
