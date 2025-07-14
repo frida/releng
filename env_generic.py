@@ -268,7 +268,7 @@ def detect_linker_flavor(cc: List[str]) -> str:
         return "gnu-ld"
     if "GNU gold " in linker_version:
         return "gnu-gold"
-    if linker_version.startswith("LLD "):
+    if linker_version.startswith("LLD ") or "compatible with GNU linkers" in linker_version:
         return "lld"
     if linker_version.startswith("ld: "):
         return "apple"
