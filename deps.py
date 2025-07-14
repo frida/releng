@@ -454,7 +454,7 @@ class Builder:
                 symfile = envdir / "toolchain-executable.symbols"
                 symfile.write_text("# No exported symbols.\n", encoding="utf-8")
                 extra_ldflags += [f"-Wl,-exported_symbols_list,{symfile}"]
-            elif self._host_machine.os != "windows":
+            elif self._host_machine.os == "freebsd":
                 verfile = envdir / "toolchain-executable.version"
                 verfile.write_text("\n".join([
                                                  "{",
@@ -463,6 +463,17 @@ class Builder:
                                                  "    __progname;",
                                                  "    environ;",
                                                  "",
+                                                 "  local:",
+                                                 "    *;",
+                                                 "};",
+                                                 ""
+                                             ]),
+                                   encoding="utf-8")
+                extra_ldflags += [f"-Wl,--version-script,{verfile}"]
+            elif self._host_machine.os != "windows":
+                verfile = envdir / "toolchain-executable.version"
+                verfile.write_text("\n".join([
+                                                 "{",
                                                  "  local:",
                                                  "    *;",
                                                  "};",
