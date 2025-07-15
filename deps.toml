@@ -350,6 +350,7 @@ options = [
     "-Dbignum=true",
     "-Datomics=disabled",
     "-Dstack_check=disabled",
+    { value = "-Dstack_mode=optimize", when = "machine.os == 'none'" },
 ]
 
 [tinycc]
