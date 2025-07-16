@@ -126,6 +126,11 @@ name = "Brotli"
 version = "01d9e2922ca878965ebcd71ee8965d2a7aadb47a"
 url = "https://github.com/frida/brotli.git"
 
+[lzfse]
+name = "LZFSE"
+version = "8382eeef4fc15f5f88ce7bdfaf2a49d7f0ef26a4"
+url = "https://github.com/frida/lzfse.git"
+
 [minizip-ng]
 when = "machine.os != 'none'"
 name = "minizip-ng"
