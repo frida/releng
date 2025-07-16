@@ -128,7 +128,7 @@ url = "https://github.com/frida/brotli.git"
 
 [lzfse]
 name = "LZFSE"
-version = "8382eeef4fc15f5f88ce7bdfaf2a49d7f0ef26a4"
+version = "5cfb7c86919d3c2c636d0d7552b51855a611ba1c"
 url = "https://github.com/frida/lzfse.git"
 
 [minizip-ng]
