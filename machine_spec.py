@@ -167,7 +167,7 @@ class MachineSpec:
 
     @property
     def is_apple(self) -> str:
-        return self.os in {"macos", "ios", "watchos", "tvos"}
+        return self.os in {"macos", "ios", "watchos", "tvos", "xros"}
 
     @property
     def system(self) -> str:
