@@ -139,6 +139,7 @@ APPLE_SDKS = {
     "watchos-simulator": "watchsimulator",
     "tvos":              "appletvos",
     "tvos-simulator":    "appletvsimulator",
+    "xros":              "xros",
 }
 
 APPLE_CLANG_ARCHS = {
@@ -154,6 +155,7 @@ APPLE_MINIMUM_OS_VERSIONS = {
     "ios":          "8.0",
     "watchos":      "9.0",
     "tvos":         "13.0",
+    "xros":         "26.0",
 }
 
 APPLE_BINARIES = [
