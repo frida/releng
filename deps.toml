@@ -261,7 +261,7 @@ dependencies = [
 
 [json-glib]
 name = "JSON-GLib"
-version = "ba01ca12fc868b37a51a4f50139b0e8b86a5709b"
+version = "1a39cbe151b02c4192987c8fcc98997a59db2154"
 url = "https://github.com/frida/json-glib.git"
 options = [
     "-Dintrospection=disabled",
