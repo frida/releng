@@ -202,7 +202,7 @@ def init_machine_config(machine: MachineSpec,
             linker_flags += ["-static-libgcc"]
             if machine.os != "windows":
                 linker_flags += ["-Wl,-z,noexecstack"]
-            if machine.os != "none":
+            if machine.os not in {"windows", "none"}:
                 linker_flags += ["-Wl,-z,relro"]
             cxx_link_flags += ["-static-libstdc++"]
 
