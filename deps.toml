@@ -226,9 +226,6 @@ options = [
     "-Ddns=disabled",
     "-Darp=disabled",
     "-Dethernet=enabled",
-    "-Dtcp_mss=4036",
-    "-Dtcp_snd_buf=65535",
-    "-Dtcp_wnd=65535",
     { value = "-Dlwip_debug=disabled", when = "machine.config_is_optimized" },
 ]
 dependencies = [
