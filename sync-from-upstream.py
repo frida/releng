@@ -13,7 +13,7 @@ upstreams = {
     "meson": ("https://github.com/mesonbuild/meson.git", "master"),
     "termux-elf-cleaner": "https://github.com/termux/termux-elf-cleaner.git",
     "libiconv": "https://git.savannah.gnu.org/git/libiconv.git",
-    "zlib": "https://github.com/madler/zlib.git",
+    "zlib": ("https://github.com/madler/zlib.git", "develop"),
     "brotli": "https://github.com/google/brotli.git",
     "minizip": "https://github.com/zlib-ng/minizip-ng.git",
     "libffi": "https://github.com/libffi/libffi.git",
