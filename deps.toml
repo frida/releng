@@ -373,7 +373,7 @@ url = "https://github.com/frida/tinycc.git"
 [openssl]
 when = "machine.os != 'none'"
 name = "OpenSSL"
-version = "7b86cb6a0c5cb9d79dca012c98a0a30a58eef5b5"
+version = "5029c4562d23547d8e29768e1b0de573c52bf3fc"
 url = "https://github.com/frida/openssl.git"
 options = [
     "-Dcli=disabled",
