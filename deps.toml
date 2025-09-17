@@ -41,7 +41,7 @@ url = "https://github.com/frida/libiconv.git"
 
 [zlib]
 name = "zlib"
-version = "a912d314d0812518d4bbd715a981e6c9484b550d"
+version = "171a3eacaea8b731ef1fc586e7777b77742e2a1d"
 url = "https://github.com/frida/zlib.git"
 
 [libffi]
