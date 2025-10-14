@@ -21,12 +21,12 @@ main (int argc,
   backend = gum_script_backend_obtain_qjs ();
 
   script = gum_script_backend_create_sync (backend, "example",
-      "Interceptor.attach(Module.getExportByName(null, 'open'), {\n"
+      "Interceptor.attach(Module.getGlobalExportByName('open'), {\n"
       "  onEnter(args) {\n"
       "    console.log(`[*] open(\"${args[0].readUtf8String()}\")`);\n"
       "  }\n"
       "});\n"
-      "Interceptor.attach(Module.getExportByName(null, 'close'), {\n"
+      "Interceptor.attach(Module.getGlobalExportByName('close'), {\n"
       "  onEnter(args) {\n"
       "    console.log(`[*] close(${args[0].toInt32()})`);\n"
       "  }\n"
