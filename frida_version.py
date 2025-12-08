@@ -4,6 +4,7 @@ import argparse
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from typing import List
@@ -40,30 +41,65 @@ def detect(repo: Path) -> FridaVersion:
     nano = 0
     commit = ""
 
-    if (repo / ".git").exists():
-        description = subprocess.run(["git", "describe", "--tags", "--always", "--long"],
-                                     cwd=repo,
-                                     capture_output=True,
-                                     encoding="utf-8").stdout
+    if not (repo / ".git").exists():
+        return FridaVersion(version_name, major, minor, micro, nano, commit)
 
-        tokens = description.strip().replace("-", ".").split(".")
-        if len(tokens) > 1:
-            (raw_major, raw_minor, raw_micro, raw_nano, commit) = tokens
-            major = int(raw_major)
-            minor = int(raw_minor)
-            micro = int(raw_micro)
-            nano = int(raw_nano)
-            if nano > 0:
-                micro += 1
+    proc = subprocess.run(
+        ["git", "describe", "--tags", "--always", "--long"],
+        cwd=repo,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+    )
+    description = proc.stdout.strip()
 
-            if nano == 0:
-                version_name = f"{major}.{minor}.{micro}"
-            else:
-                version_name = f"{major}.{minor}.{micro}-dev.{nano - 1}"
+    if "-" not in description:
+        commit = description
+        return FridaVersion(version_name, major, minor, micro, nano, commit)
+
+    parts = description.rsplit("-", 2)
+    if len(parts) != 3:
+        raise VersionParseError(f"Unexpected format from git describe: {description!r}")
+
+    tag_part, distance_str, commit_part = parts
+    commit = commit_part.lstrip("g")
+
+    try:
+        distance = int(distance_str)
+    except ValueError as exc:
+        raise VersionParseError(f"Invalid distance in {description!r}") from exc
+
+    nano = distance
+
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", tag_part)
+    if m is None:
+        raise VersionParseError(
+            f"Tag does not match expected semver pattern: {tag_part!r}"
+        )
+
+    major = int(m.group(1))
+    minor = int(m.group(2))
+    micro = int(m.group(3))
+    suffix = m.group(4)
+
+    if suffix is None:
+        if distance == 0:
+            version_name = f"{major}.{minor}.{micro}"
         else:
-            commit = tokens[0]
+            micro += 1
+            version_name = f"{major}.{minor}.{micro}-dev.{distance - 1}"
+    else:
+        base = f"{major}.{minor}.{micro}-{suffix}"
+        if distance == 0:
+            version_name = base
+        else:
+            version_name = f"{base}-dev.{distance - 1}"
 
     return FridaVersion(version_name, major, minor, micro, nano, commit)
+
+
+class VersionParseError(Exception):
+    pass
 
 
 if __name__ == "__main__":
