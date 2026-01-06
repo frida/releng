@@ -36,6 +36,7 @@ upstreams = {
     "v8": "https://chromium.googlesource.com/v8/v8",
     "capstone": ("https://github.com/capstone-engine/capstone.git", "v5"),
     "tinycc": "https://repo.or.cz/tinycc.git",
+    "selinux": "https://github.com/SELinuxProject/selinux.git",
 }
 
 
