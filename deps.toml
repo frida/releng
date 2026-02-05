@@ -102,6 +102,15 @@ dependencies = [
                               """ }
 ]
 
+[elfutils]
+when = "machine.os in {'linux', 'android'}"
+name = "elfutils"
+version = "1284bbc128473aea220337685985d465607fbac8"
+url = "https://github.com/frida/elfutils.git"
+dependencies = [
+    "zlib",
+]
+
 [libdwarf]
 when = "machine.os in {'linux', 'android', 'freebsd', 'qnx'}"
 name = "libdwarf"
@@ -109,6 +118,16 @@ version = "50e3115b340c6a58d2f61af96f120a9d111ac024"
 url = "https://github.com/frida/libdwarf.git"
 options = [
     "-Ddecompression=false",
+]
+
+[libbpf]
+when = "machine.os in {'linux', 'android'}"
+name = "libbpf"
+version = "6c8d0d00a122fe126b7a3094f0785340128506f5"
+url = "https://github.com/frida/libbpf.git"
+dependencies = [
+    "elfutils",
+    "zlib",
 ]
 
 [xz]
