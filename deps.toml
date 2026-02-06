@@ -353,7 +353,7 @@ dependencies = [
 
 [capstone]
 name = "Capstone"
-version = "27fb5a53bc77baf3c3af7ccd466041418cecca35"
+version = "fecd93b6e54c0a1df285841620192ffff916a031"
 url = "https://github.com/frida/capstone.git"
 options = [
     "-Darchs=all",
