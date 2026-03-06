@@ -18,11 +18,15 @@ class BuildEnvState:
 
 
 def dump_build_env_state(path: Path, state: BuildEnvState):
+    allowed_prebuilds = state.allowed_prebuilds
+    if not isinstance(allowed_prebuilds, list):
+        allowed_prebuilds = sorted(allowed_prebuilds)
+
     path.write_text(json.dumps({
         "meson": state.meson,
         "build": _serialize_machine_config(state.build),
         "host": _serialize_machine_config(state.host),
-        "allowed_prebuilds": state.allowed_prebuilds,
+        "allowed_prebuilds": allowed_prebuilds,
         "deps": str(state.deps),
     }), encoding="utf-8")
 
