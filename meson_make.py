@@ -1,13 +1,13 @@
 import argparse
 import os
 from pathlib import Path
-import pickle
 import shlex
 import shutil
 import sys
 from typing import Callable, Dict, List
 
 from . import env
+from .env_state import load_build_env_state
 from .meson_configure import configure
 
 
@@ -44,7 +44,9 @@ def make(sourcedir: Path,
          targets: List[str],
          environ: Dict[str, str] = os.environ,
          call_meson: Callable = env.call_meson):
-    if not (builddir / "build.ninja").exists():
+    env_state_path = builddir / "frida-env.json"
+
+    if not (builddir / "build.ninja").exists() or not env_state_path.exists():
         configure(sourcedir, builddir, environ=environ)
 
     compile_options = []
@@ -61,18 +63,18 @@ def make(sourcedir: Path,
         "test": ["test"] + test_options,
     }
 
-    env_state = pickle.loads((builddir / "frida-env.dat").read_bytes())
+    env_state = load_build_env_state(env_state_path)
 
-    machine_config = env_state["host"]
+    machine_config = env_state.host
     if machine_config is None:
-        machine_config = env_state["build"]
+        machine_config = env_state.build
     meson_env = machine_config.make_merged_environment(environ)
-    meson_env["FRIDA_ALLOWED_PREBUILDS"] = ",".join(env_state["allowed_prebuilds"])
-    meson_env["FRIDA_DEPS"] = str(env_state["deps"])
+    meson_env["FRIDA_ALLOWED_PREBUILDS"] = ",".join(env_state.allowed_prebuilds)
+    meson_env["FRIDA_DEPS"] = str(env_state.deps)
 
     def do_meson_command(args):
         call_meson(args,
-                   use_submodule=env_state["meson"] == "internal",
+                   use_submodule=env_state.meson == "internal",
                    cwd=builddir,
                    env=meson_env,
                    check=True)
