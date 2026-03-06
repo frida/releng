@@ -1,7 +1,6 @@
 import argparse
 import os
 from pathlib import Path
-import pickle
 import platform
 import re
 import shlex
@@ -19,6 +18,7 @@ from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
         UserComboOption, UserFeatureOption, UserOption, UserStringOption
 
 from . import deps, env
+from .env_state import BuildEnvState, dump_build_env_state
 from .machine_spec import MachineSpec
 from .progress import ProgressCallback, print_progress
 
@@ -228,13 +228,13 @@ def configure(sourcedir: Path,
     if platform.system() == "Windows":
         (builddir / "make.bat").write_text(generate_out_of_tree_make_bat(sourcedir), encoding="utf-8")
 
-    (builddir / "frida-env.dat").write_bytes(pickle.dumps({
-        "meson": meson,
-        "build": build_config,
-        "host": host_config if host_config is not build_config else None,
-        "allowed_prebuilds": allowed_prebuilds,
-        "deps": deps_dir,
-    }))
+    dump_build_env_state(builddir / "frida-env.json", BuildEnvState(
+        meson=meson,
+        build=build_config,
+        host=host_config if host_config is not build_config else None,
+        allowed_prebuilds=allowed_prebuilds,
+        deps=deps_dir,
+    ))
 
 
 def parse_prefix(raw_prefix: str) -> Path:
