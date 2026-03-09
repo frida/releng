@@ -41,7 +41,7 @@ def init_machine_config(machine: MachineSpec,
 
     android_build_os = "darwin" if build_machine.os == "macos" else build_machine.os
     android_build_arch = "x86_64" if build_machine.os in {"macos", "linux"} else build_machine.arch
-    android_api = 19 if machine.arch in {"x86", "arm"} else 21
+    android_api = 21
 
     llvm_bindir = ndk_root / "toolchains" / "llvm" / "prebuilt" / f"{android_build_os}-{android_build_arch}" / "bin"
 
@@ -111,7 +111,7 @@ class NdkVersionError(Exception):
     pass
 
 
-NDK_REQUIRED = 25
+NDK_REQUIRED = 29
 
 NDK_BINARIES = [
     ("c",       "clang"),
