@@ -85,9 +85,6 @@ def init_machine_config(machine: MachineSpec,
     linker_flags += ARCH_LINKER_FLAGS.get(machine.arch, [])
     linker_flags += read_envflags("LDFLAGS")
 
-    if android_api < 24:
-        cxx_like_flags += ["-D_LIBCPP_HAS_NO_OFF_T_FUNCTIONS"]
-
     constants = config["constants"]
     constants["common_flags"] = strv_to_meson(common_flags)
     constants["c_like_flags"] = strv_to_meson(c_like_flags)
