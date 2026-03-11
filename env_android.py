@@ -44,6 +44,7 @@ def init_machine_config(machine: MachineSpec,
     android_api = 21
 
     llvm_bindir = ndk_root / "toolchains" / "llvm" / "prebuilt" / f"{android_build_os}-{android_build_arch}" / "bin"
+    libcxx_include_dir = llvm_bindir.parent / "sysroot" / "usr" / "include" / "c++" / "v1"
 
     binaries = config["binaries"]
     for (identifier, tool_name, *rest) in NDK_BINARIES:
@@ -80,8 +81,14 @@ def init_machine_config(machine: MachineSpec,
     read_envflags = lambda name: shlex.split(environ.get(name, ""))
 
     common_flags += ARCH_COMMON_FLAGS.get(machine.arch, [])
+
     c_like_flags += ARCH_C_LIKE_FLAGS.get(machine.arch, [])
     c_like_flags += read_envflags("CPPFLAGS")
+
+    if _needs_patched_fstream(machine, android_api):
+        overlay_dir = _generate_libcpp_overlay(libcxx_include_dir, outdir)
+        cxx_like_flags += ["-isystem", str(overlay_dir)]
+
     linker_flags += ARCH_LINKER_FLAGS.get(machine.arch, [])
     linker_flags += read_envflags("LDFLAGS")
 
@@ -98,6 +105,63 @@ def init_machine_config(machine: MachineSpec,
     options["c_link_args"] = "linker_flags"
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["b_lundef"] = "true"
+
+
+def _needs_patched_fstream(machine: MachineSpec, android_api: int) -> bool:
+    return machine.pointer_size == 4 and android_api < 24
+
+
+def _generate_libcpp_overlay(libcxx_include_dir: Path, outdir: Path) -> Path:
+    src = libcxx_include_dir / "fstream"
+    if not src.exists():
+        raise FileNotFoundError(f"Missing libc++ header: {src}")
+
+    overlay_dir = outdir / "libcpp-overlay"
+    overlay_dir.mkdir(parents=True, exist_ok=True)
+
+    patched = src.read_text(encoding="utf-8")
+    patched = _patch_fstream_header(patched)
+
+    dst = overlay_dir / "fstream"
+    old_contents = dst.read_text(encoding="utf-8") if dst.exists() else None
+    if old_contents != patched:
+        dst.write_text(patched, encoding="utf-8")
+
+    return overlay_dir
+
+
+def _patch_fstream_header(header: str) -> str:
+    old_fseek = """#    elif defined(_NEWLIB_VERSION)
+  return fseek(__file, __offset, __whence);
+#    else
+  return ::fseeko(__file, __offset, __whence);
+#    endif"""
+
+    new_fseek = """#    elif defined(_NEWLIB_VERSION) || (defined(__ANDROID__) && __SIZEOF_POINTER__ == 4 && __ANDROID_API__ < 24)
+  return fseek(__file, __offset, __whence);
+#    else
+  return ::fseeko(__file, __offset, __whence);
+#    endif"""
+
+    old_ftell = """#    elif defined(_NEWLIB_VERSION)
+  return ftell(__file);
+#    else
+  return ftello(__file);
+#    endif"""
+
+    new_ftell = """#    elif defined(_NEWLIB_VERSION) || (defined(__ANDROID__) && __SIZEOF_POINTER__ == 4 && __ANDROID_API__ < 24)
+  return ftell(__file);
+#    else
+  return ftello(__file);
+#    endif"""
+
+    result = header.replace(old_fseek, new_fseek)
+    result = result.replace(old_ftell, new_ftell)
+
+    if result == header:
+        raise ValueError("Failed to patch libc++ fstream header; expected patterns not found")
+
+    return result
 
 
 class NdkNotFoundError(Exception):
