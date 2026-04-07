@@ -199,23 +199,29 @@ def generate_machine_config(machine: MachineSpec,
                 pkg_config += ["--static"]
             if sdk_prefix is not None:
                 pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
-            binaries["pkg-config"] = strv_to_meson(pkg_config)
 
         vala_compiler = detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
 
     pkg_config_path = shlex.split(environ.get("PKG_CONFIG_PATH", "").replace("\\", "\\\\"))
+    pkg_config_libdir = None
 
     if sdk_prefix is not None:
         builtin_options["vala_args"] = strv_to_meson([
             "--vapidir=" + str(sdk_prefix / "share" / "vala" / "vapi")
         ])
 
-        pkg_config_path += [str(sdk_prefix / machine.libdatadir / "pkgconfig")]
+        pkg_config_libdir = str(sdk_prefix / machine.libdatadir / "pkgconfig")
 
         sdk_bindir = sdk_prefix / "bin" / build_machine.os_dash_arch
         if sdk_bindir.exists():
             for f in sdk_bindir.iterdir():
                 binaries[f.stem] = strv_to_meson([str(f)])
+
+    if pkg_config is not None:
+        wrapper = outdir / f"frida-pkg-config-{machine.identifier}.py"
+        wrapper.write_text(make_pkg_config_wrapper(pkg_config, pkg_config_path, pkg_config_libdir), encoding="utf-8")
+        pkg_config = [sys.executable, str(wrapper)]
+        binaries["pkg-config"] = strv_to_meson(pkg_config)
 
     if vala_compiler is not None:
         valac, vapidir = vala_compiler
@@ -224,8 +230,6 @@ def generate_machine_config(machine: MachineSpec,
             f"--vapidir={vapidir}",
         ]
         if pkg_config is not None:
-            wrapper = outdir / "frida-pkg-config.py"
-            wrapper.write_text(make_pkg_config_wrapper(pkg_config, pkg_config_path), encoding="utf-8")
             vala += [f"--pkg-config={quote(sys.executable)} {quote(str(wrapper))}"]
         binaries["vala"] = strv_to_meson(vala)
 
@@ -299,7 +303,10 @@ def find_exe_wrapper(machine: MachineSpec,
     return [qemu_binary, "-L", qemu_sysroot]
 
 
-def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str]) -> str:
+def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str], pkg_config_libdir: Optional[str] = None) -> str:
+    overrides = {"PKG_CONFIG_PATH": os.pathsep.join(pkg_config_path)}
+    if pkg_config_libdir is not None:
+        overrides["PKG_CONFIG_LIBDIR"] = pkg_config_libdir
     return "\n".join([
         "import os",
         "import subprocess",
@@ -311,7 +318,7 @@ def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str]) -
         "]",
         "env = {",
         "    **os.environ,",
-        f"    'PKG_CONFIG_PATH': {repr(os.pathsep.join(pkg_config_path))},",
+        *[f"    {k!r}: {v!r}," for k, v in overrides.items()],
         "}",
         f"p = subprocess.run(args, env=env)",
         "sys.exit(p.returncode)"
