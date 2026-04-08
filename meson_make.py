@@ -57,7 +57,7 @@ def make(sourcedir: Path,
         "all": ["compile"] + compile_options,
         "clean": ["compile", "--clean"] + compile_options,
         "distclean": lambda: distclean(sourcedir, builddir),
-        "install": ["install"],
+        "install": ["install", "--skip-subprojects"],
         "test": ["test"] + test_options,
     }
 
