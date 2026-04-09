@@ -232,6 +232,7 @@ def configure(sourcedir: Path,
         "meson": meson,
         "build": build_config,
         "host": host_config if host_config is not build_config else None,
+        "default_library": default_library,
         "allowed_prebuilds": allowed_prebuilds,
         "deps": deps_dir,
     }))

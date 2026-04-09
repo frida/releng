@@ -53,15 +53,19 @@ def make(sourcedir: Path,
 
     test_options = shlex.split(environ.get("FRIDA_TEST_OPTIONS", "-v"))
 
+    env_state = pickle.loads((builddir / "frida-env.dat").read_bytes())
+
+    install_options = []
+    if env_state.get("default_library") == "shared":
+        install_options += ["--skip-subprojects"]
+
     standard_targets = {
         "all": ["compile"] + compile_options,
         "clean": ["compile", "--clean"] + compile_options,
         "distclean": lambda: distclean(sourcedir, builddir),
-        "install": ["install", "--skip-subprojects"],
+        "install": ["install"] + install_options,
         "test": ["test"] + test_options,
     }
-
-    env_state = pickle.loads((builddir / "frida-env.dat").read_bytes())
 
     machine_config = env_state["host"]
     if machine_config is None:
