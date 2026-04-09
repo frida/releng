@@ -304,10 +304,7 @@ def find_exe_wrapper(machine: MachineSpec,
 
 
 def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str], pkg_config_libdir: Optional[str] = None) -> str:
-    overrides = {"PKG_CONFIG_PATH": os.pathsep.join(pkg_config_path)}
-    if pkg_config_libdir is not None:
-        overrides["PKG_CONFIG_LIBDIR"] = pkg_config_libdir
-    return "\n".join([
+    lines = [
         "import os",
         "import subprocess",
         "import sys",
@@ -316,13 +313,20 @@ def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str], p
         f" {pprint.pformat(pkg_config, indent=4)[1:-1]},",
         "    *sys.argv[1:],",
         "]",
-        "env = {",
-        "    **os.environ,",
-        *[f"    {k!r}: {v!r}," for k, v in overrides.items()],
-        "}",
-        f"p = subprocess.run(args, env=env)",
-        "sys.exit(p.returncode)"
-    ])
+        "env = {**os.environ}",
+    ]
+    if pkg_config_path:
+        joined = os.pathsep.join(pkg_config_path)
+        sep = os.pathsep
+        lines.append(f"env['PKG_CONFIG_PATH'] = {joined!r} + {sep!r}"
+                     f" + env.get('PKG_CONFIG_PATH', '')")
+    if pkg_config_libdir is not None:
+        lines.append(f"env['PKG_CONFIG_LIBDIR'] = {pkg_config_libdir!r}")
+    lines += [
+        "p = subprocess.run(args, env=env)",
+        "sys.exit(p.returncode)",
+    ]
+    return "\n".join(lines)
 
 
 def detect_toolchain_vala_compiler(toolchain_prefix: Path,
