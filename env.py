@@ -195,9 +195,9 @@ def generate_machine_config(machine: MachineSpec,
             pkg_config = [
                 str(pkg_config_binary),
             ]
-            if default_library == "static":
-                pkg_config += ["--static"]
             if sdk_prefix is not None:
+                if default_library == "static":
+                    pkg_config += ["--static"]
                 pkg_config += [f"--define-variable=frida_sdk_prefix={sdk_prefix}"]
 
         vala_compiler = detect_toolchain_vala_compiler(toolchain_prefix, build_machine)
