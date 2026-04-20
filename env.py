@@ -186,7 +186,10 @@ def generate_machine_config(machine: MachineSpec,
             if tool_path is not None:
                 binaries[tool_name] = strv_to_meson([str(tool_path)])
 
-        pkg_config_binary = shutil.which("pkg-config")
+        if machine == build_machine:
+            pkg_config_binary = shutil.which("pkg-config")
+        else:
+            pkg_config_binary = None
         if pkg_config_binary is None:
             pkg_config_binary = toolchain_bindir / f"pkg-config{exe_suffix}"
             if not pkg_config_binary.exists():
