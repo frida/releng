@@ -187,7 +187,7 @@ def generate_machine_config(machine: MachineSpec,
                 binaries[tool_name] = strv_to_meson([str(tool_path)])
 
         if machine == build_machine:
-            pkg_config_binary = shutil.which("pkg-config")
+            pkg_config_binary = find_usable_system_pkg_config()
         else:
             pkg_config_binary = None
         if pkg_config_binary is None:
@@ -304,6 +304,23 @@ def find_exe_wrapper(machine: MachineSpec,
         raise QEMUNotFoundError(f"unable to find {qemu_flavor}, needed due to FRIDA_QEMU_SYSROOT being set")
 
     return [qemu_binary, "-L", qemu_sysroot]
+
+
+def find_usable_system_pkg_config() -> Optional[str]:
+    binary = shutil.which("pkg-config")
+    if binary is None:
+        return None
+    try:
+        helptext = subprocess.run([binary, "--help"],
+                                  capture_output=True,
+                                  text=True,
+                                  timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    is_strawberry_perl_stub = "Pure-Perl" in helptext
+    if is_strawberry_perl_stub:
+        return None
+    return binary
 
 
 def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str], pkg_config_libdir: Optional[str] = None) -> str:
