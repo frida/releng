@@ -18,7 +18,8 @@ def init_machine_config(machine: MachineSpec,
                         config: ConfigParser,
                         outpath: List[str],
                         outenv: Dict[str, str],
-                        outdir: Path):
+                        outdir: Path,
+                        apple_min_os: Optional[Dict[str, str]] = None):
     xcenv = {**environ}
     if machine.arch == "arm64eoabi":
         try:
@@ -38,8 +39,11 @@ def init_machine_config(machine: MachineSpec,
 
     clang_arch = APPLE_CLANG_ARCHS.get(machine.arch, machine.arch)
 
-    os_minver = APPLE_MINIMUM_OS_VERSIONS.get(machine.os_dash_arch,
-                                              APPLE_MINIMUM_OS_VERSIONS[machine.os])
+    overrides = apple_min_os or {}
+    os_minver = (overrides.get(machine.os_dash_arch)
+                 or overrides.get(machine.os)
+                 or APPLE_MINIMUM_OS_VERSIONS.get(machine.os_dash_arch,
+                                                  APPLE_MINIMUM_OS_VERSIONS[machine.os]))
 
     target = f"{clang_arch}-apple-{machine.os}{os_minver}"
     if machine.config is not None:

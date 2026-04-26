@@ -17,7 +17,8 @@ def init_machine_config(machine: MachineSpec,
                         config: ConfigParser,
                         outpath: List[str],
                         outenv: Dict[str, str],
-                        outdir: Path):
+                        outdir: Path,
+                        apple_min_os: Optional[Dict[str, str]] = None):
     ndk_found = False
     try:
         ndk_root = Path(environ["ANDROID_NDK_ROOT"])

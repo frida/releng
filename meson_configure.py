@@ -8,7 +8,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 RELENG_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = RELENG_DIR / "meson-scripts"
@@ -18,7 +18,7 @@ import mesonbuild.interpreter
 from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
         UserComboOption, UserFeatureOption, UserOption, UserStringOption
 
-from . import deps, env
+from . import deps, env, env_apple
 from .machine_spec import MachineSpec
 from .progress import ProgressCallback, print_progress
 
@@ -69,6 +69,14 @@ def main():
                       metavar="{" + ",".join(query_supported_bundle_types(include_wildcards=True)) + "}",
                       type=parse_bundle_type_set,
                       default=set())
+    opts.add_argument("--with-apple-min-os",
+                      help="override Apple deployment target floor for one platform;\n"
+                           "may be given multiple times. Defaults:\n"
+                           "  " + ", ".join(f"{k}={v}" for k, v in env_apple.APPLE_MINIMUM_OS_VERSIONS.items()),
+                      metavar="PLATFORM=VERSION",
+                      type=parse_apple_min_os_override,
+                      action="append",
+                      default=[])
     opts.add_argument("extra_meson_options",
                       nargs="*",
                       help=argparse.SUPPRESS)
@@ -103,7 +111,8 @@ def main():
                   default_library,
                   allowed_prebuilds,
                   options.meson,
-                  collect_meson_options(options))
+                  collect_meson_options(options),
+                  apple_min_os=dict(options.with_apple_min_os))
     except Exception as e:
         print(e, file=sys.stderr)
         if isinstance(e, subprocess.CalledProcessError):
@@ -126,7 +135,8 @@ def configure(sourcedir: Path,
               meson: str = "internal",
               extra_meson_options: List[str] = [],
               call_meson: Callable = env.call_meson,
-              on_progress: ProgressCallback = print_progress):
+              on_progress: ProgressCallback = print_progress,
+              apple_min_os: Optional[Dict[str, str]] = None):
     if prefix is None:
         prefix = env.detect_default_prefix()
 
@@ -209,7 +219,8 @@ def configure(sourcedir: Path,
                                          host_sdk_prefix,
                                          call_selected_meson,
                                          default_library,
-                                         builddir)
+                                         builddir,
+                                         apple_min_os)
 
     meson_options += [f"--native-file={build_config.machine_file}"]
     if host_config is not build_config:
@@ -275,6 +286,19 @@ def parse_bundle_type_set(raw_array: str) -> List[str]:
         else:
             result.add(bundle_type)
     return result
+
+
+def parse_apple_min_os_override(raw_value: str) -> Tuple[str, str]:
+    platform, _, version = raw_value.partition("=")
+    if not version:
+        raise argparse.ArgumentTypeError(
+                f"invalid Apple min OS override: '{raw_value}' (expected PLATFORM=VERSION)")
+    valid_platforms = list(env_apple.APPLE_MINIMUM_OS_VERSIONS.keys())
+    if platform not in valid_platforms:
+        pretty_choices = "', '".join(valid_platforms)
+        raise argparse.ArgumentTypeError(
+                f"invalid Apple platform: '{platform}' (choose from '{pretty_choices}')")
+    return (platform, version)
 
 
 def raise_toolchain_not_found(e: Exception):

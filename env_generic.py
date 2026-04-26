@@ -22,7 +22,8 @@ def init_machine_config(machine: MachineSpec,
                         config: ConfigParser,
                         outpath: List[str],
                         outenv: Dict[str, str],
-                        outdir: Path):
+                        outdir: Path,
+                        apple_min_os: Optional[Dict[str, str]] = None):
     allow_undefined_symbols = machine.os == "freebsd"
 
     options = config["built-in options"]
