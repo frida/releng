@@ -213,12 +213,12 @@ dependencies = [
 [libnice]
 when = "machine.os != 'none'"
 name = "libnice"
-version = "e12567b0a16a0c2eb5dfe5e0782baba8496772ff"
+version = "9a3da6e3e5bbcf935fd85b6b8557ff8c7dd9032c"
 url = "https://github.com/frida/libnice.git"
 options = [
     "-Dgupnp=disabled",
     "-Dgstreamer=disabled",
-    "-Dcrypto-library=openssl",
+    "-Dcrypto-library=auto",
     "-Dexamples=disabled",
     "-Dtests=disabled",
     "-Dintrospection=disabled",
