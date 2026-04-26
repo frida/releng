@@ -197,7 +197,8 @@ class CompilerApplication:
 
         library_dirs = infer_library_dirs(library_flags)
         library_names = infer_library_names(library_flags)
-        library_paths, extra_flags = resolve_library_paths(library_names, library_dirs, self.machine)
+        library_paths, extra_flags = resolve_library_paths(library_names, library_dirs, self.machine,
+                                                           self._build_root())
         extra_flags += infer_linker_flags(library_flags)
 
         if self.compiler_argument_syntax == "msvc":
@@ -206,6 +207,12 @@ class CompilerApplication:
             thirdparty_symbol_mappings = self._do_generate_library_unix(library_paths)
 
         return (extra_flags, thirdparty_symbol_mappings)
+
+    def _build_root(self):
+        for candidate in [self.output_dir, *self.output_dir.parents]:
+            if is_meson_build_root(candidate):
+                return candidate
+        return None
 
     def _do_generate_library_msvc(self, library_paths):
         subprocess.run(self.meson_config["lib"] + ["/nologo", "/out:" + str(self.output_dir / self.library_filename)] + library_paths,
@@ -407,7 +414,10 @@ def infer_linker_flags(flags):
     return [flag for flag in flags if flag.startswith("-Wl") or flag == "-pthread"]
 
 
-def resolve_library_paths(names, dirs, machine):
+def resolve_library_paths(names, dirs, machine, build_root=None):
+    if build_root is not None:
+        dirs = wrap_overrides_first(dirs, build_root)
+
     paths = []
     flags = []
     for name in names:
@@ -424,10 +434,20 @@ def resolve_library_paths(names, dirs, machine):
     return (deduplicate(paths), flags)
 
 
+def wrap_overrides_first(dirs, build_root):
+    prefix = build_root.resolve()
+    inside_build_tree = lambda d: d.resolve() == prefix or prefix in d.resolve().parents
+    return [d for d in dirs if inside_build_tree(d)] + [d for d in dirs if not inside_build_tree(d)]
+
+
 def is_os_library(path, machine):
     if machine.os == "linux":
         return path.name in {"libdl.a", "libm.a", "libpthread.a"}
     return False
+
+
+def is_meson_build_root(path):
+    return (path / "meson-info").is_dir()
 
 
 def query_pkgconfig_cflags(package, meson_config):
