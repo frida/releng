@@ -196,7 +196,7 @@ dependencies = [
 [glib-networking]
 when = "machine.os != 'none'"
 name = "glib-networking"
-version = "5c9331ba47790ee4f541185f3ca0971fe84fcfc2"
+version = "ef47b1a09cf8c1875f181bcf901643689a56d12f"
 url = "https://github.com/frida/glib-networking.git"
 options = [
     "-Dgnutls=disabled",
