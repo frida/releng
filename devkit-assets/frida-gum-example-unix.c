@@ -27,6 +27,7 @@ main (int argc,
   GumInterceptor * interceptor;
   ExampleListenerData * data;
   GumInvocationListener * listener;
+  GumAttachOptions open_options = { 0, }, close_options = { 0, };
 
   gum_init_embedded ();
 
@@ -36,16 +37,16 @@ main (int argc,
   listener = gum_make_call_listener (example_listener_on_enter, example_listener_on_leave, data, g_free);
 
   gum_interceptor_begin_transaction (interceptor);
+  open_options.listener_function_data = GSIZE_TO_POINTER (EXAMPLE_HOOK_OPEN);
   gum_interceptor_attach (interceptor,
       GSIZE_TO_POINTER (gum_module_find_global_export_by_name ("open")),
       listener,
-      GSIZE_TO_POINTER (EXAMPLE_HOOK_OPEN),
-      GUM_ATTACH_FLAGS_NONE);
+      &open_options);
+  close_options.listener_function_data = GSIZE_TO_POINTER (EXAMPLE_HOOK_CLOSE);
   gum_interceptor_attach (interceptor,
       GSIZE_TO_POINTER (gum_module_find_global_export_by_name ("close")),
       listener,
-      GSIZE_TO_POINTER (EXAMPLE_HOOK_CLOSE),
-      GUM_ATTACH_FLAGS_NONE);
+      &close_options);
   gum_interceptor_end_transaction (interceptor);
 
   close (open ("/etc/hosts", O_RDONLY));

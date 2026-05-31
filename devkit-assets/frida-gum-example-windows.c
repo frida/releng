@@ -36,6 +36,7 @@ main (int argc,
   ExampleListenerData * data;
   GumInvocationListener * listener;
   GumModule * user32, * kernel32;
+  GumAttachOptions beep_options = { 0, }, sleep_options = { 0, };
 
   gum_init_embedded ();
 
@@ -48,16 +49,17 @@ main (int argc,
   kernel32 = gum_process_find_module_by_name ("kernel32.dll");
 
   gum_interceptor_begin_transaction (interceptor);
+  beep_options.listener_function_data =
+      GSIZE_TO_POINTER (EXAMPLE_HOOK_MESSAGE_BEEP);
   gum_interceptor_attach (interceptor,
       GSIZE_TO_POINTER (gum_module_find_export_by_name (user32, "MessageBeep")),
       listener,
-      GSIZE_TO_POINTER (EXAMPLE_HOOK_MESSAGE_BEEP),
-      GUM_ATTACH_FLAGS_NONE);
+      &beep_options);
+  sleep_options.listener_function_data = GSIZE_TO_POINTER (EXAMPLE_HOOK_SLEEP);
   gum_interceptor_attach (interceptor,
       GSIZE_TO_POINTER (gum_module_find_export_by_name (kernel32, "Sleep")),
       listener,
-      GSIZE_TO_POINTER (EXAMPLE_HOOK_SLEEP),
-      GUM_ATTACH_FLAGS_NONE);
+      &sleep_options);
   gum_interceptor_end_transaction (interceptor);
 
   MessageBeep (MB_ICONINFORMATION);
