@@ -237,7 +237,7 @@ url = "https://github.com/frida/libusb.git"
 [lwip]
 when = "machine.os != 'none'"
 name = "lwIP"
-version = "334ebb20a22023db2f0d5017e96eb0c7798082fd"
+version = "a9f759897f26347c1a41d8d2a6d3a89aba9ce57b"
 url = "https://github.com/frida/lwip.git"
 options = [
     "-Dipv4=disabled",
