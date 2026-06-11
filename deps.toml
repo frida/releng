@@ -1,5 +1,5 @@
 [dependencies]
-version = "20260531"
+version = "20260611"
 bootstrap_version = "20250801"
 
 [ninja]
