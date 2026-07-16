@@ -143,10 +143,18 @@ def init_machine_config(machine: MachineSpec,
             outenv["VSINSTALLDIR"] = str(vs_dir) + "\\"
             outenv["VCINSTALLDIR"] = str(vs_dir / "VC") + "\\"
             outenv["Platform"] = machine.msvc_platform
-            for path in winenv.detect_msvs_include_path(toolchain_prefix):
+            include_paths = winenv.detect_msvs_include_path(toolchain_prefix)
+            library_paths = winenv.detect_msvs_library_path(machine, toolchain_prefix)
+            # The flags scope the paths per-machine, which cross builds need as
+            # the build and host toolchains differ. The environment additionally
+            # reaches the build-machine compiler in a native build, whose native
+            # targets don't pick up the host machine's compiler flags.
+            for path in include_paths:
                 c_like_flags += [f"/I{path}"]
-            for path in winenv.detect_msvs_library_path(machine, toolchain_prefix):
+            for path in library_paths:
                 linker_flags += [f"/LIBPATH:{path}"]
+            outenv["INCLUDE"] = ";".join([str(path) for path in include_paths])
+            outenv["LIB"] = ";".join([str(path) for path in library_paths])
         elif machine != build_machine \
                 and "CC" not in environ \
                 and "CFLAGS" not in environ \
