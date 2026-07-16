@@ -143,8 +143,10 @@ def init_machine_config(machine: MachineSpec,
             outenv["VSINSTALLDIR"] = str(vs_dir) + "\\"
             outenv["VCINSTALLDIR"] = str(vs_dir / "VC") + "\\"
             outenv["Platform"] = machine.msvc_platform
-            outenv["INCLUDE"] = ";".join([str(path) for path in winenv.detect_msvs_include_path(toolchain_prefix)])
-            outenv["LIB"] = ";".join([str(path) for path in winenv.detect_msvs_library_path(machine, toolchain_prefix)])
+            for path in winenv.detect_msvs_include_path(toolchain_prefix):
+                c_like_flags += [f"/I{path}"]
+            for path in winenv.detect_msvs_library_path(machine, toolchain_prefix):
+                linker_flags += [f"/LIBPATH:{path}"]
         elif machine != build_machine \
                 and "CC" not in environ \
                 and "CFLAGS" not in environ \
