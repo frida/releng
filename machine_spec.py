@@ -113,12 +113,15 @@ class MachineSpec:
     def maybe_adapt_to_host(self, host_machine: MachineSpec) -> MachineSpec:
         if self.identifier == host_machine.identifier and host_machine.triplet is not None:
             return host_machine
-        if self.os == "windows" and host_machine.os == "windows":
-            if host_machine.arch in {"x86_64", "x86"}:
-                return host_machine
-            if self.arch == host_machine.arch:
-                return host_machine
+        if self.os == "windows" and host_machine.os == "windows" and self.can_run(host_machine):
+            return host_machine
         return self
+
+    def can_run(self, other: MachineSpec) -> bool:
+        if self.arch == other.arch:
+            return True
+        intel = {"x86", "x86_64"}
+        return self.arch in intel and other.arch in intel
 
     @property
     def identifier(self) -> str:
