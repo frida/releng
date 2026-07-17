@@ -86,10 +86,6 @@ def init_machine_config(machine: MachineSpec,
     c_like_flags = read_envflags("CPPFLAGS")
 
     linker_flags = ["-Wl,-dead_strip"]
-    if (clang_path.parent / "ld-classic").exists():
-        # New linker links with libresolv even if we're not using any symbols from it,
-        # at least as of Xcode 15.0 beta 7.
-        linker_flags += ["-Wl,-ld_classic"]
     linker_flags += read_envflags("LDFLAGS")
 
     constants = config["constants"]
