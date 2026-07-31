@@ -32,6 +32,8 @@ def init_machine_config(machine: MachineSpec,
     options["c_link_args"] = "linker_flags"
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["b_lundef"] = str(not allow_undefined_symbols).lower()
+    if machine.config == "softfloat":
+        options["b_staticpic"] = "false"
 
     binaries = config["binaries"]
     cc = None
@@ -206,6 +208,8 @@ def init_machine_config(machine: MachineSpec,
         else:
             common_flags += ARCH_COMMON_FLAGS_UNIX.get(machine.arch, [])
         c_like_flags += ARCH_C_LIKE_FLAGS_UNIX.get(machine.arch, [])
+        if machine.config == "softfloat":
+            common_flags += ARCH_SOFTFLOAT_FLAGS_UNIX.get(machine.arch, [])
 
         c_like_flags += [
             "-ffunction-sections",
@@ -227,7 +231,8 @@ def init_machine_config(machine: MachineSpec,
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
 
-        if machine.os == "none":
+        # newlib's syscall stubs; the soft-float flavour brings picolibc instead.
+        if machine.os == "none" and machine.config != "softfloat":
             linker_flags += ["-specs=nosys.specs"]
 
     constants = config["constants"]
@@ -361,6 +366,19 @@ ARCH_COMMON_FLAGS_QNX = {
     "armeabi": [
         "-march=armv7-a",
         "-mno-unaligned-access",
+    ],
+}
+
+# AAPCS64 mandates hardware FP, so only clang can pass doubles in general-purpose
+# registers. x18 and -fno-pic travel with it because the first host needing this is
+# the Linux arm64 kernel, which reserves the former and whose module loader rejects
+# GOT relocations.
+ARCH_SOFTFLOAT_FLAGS_UNIX = {
+    "arm64": [
+        "-mabi=aapcs-soft",
+        "-mgeneral-regs-only",
+        "-ffixed-x18",
+        "-fno-pic",
     ],
 }
 
