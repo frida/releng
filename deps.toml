@@ -370,7 +370,9 @@ options = [
     "-Dlibc=false",
     "-Dbignum=true",
     "-Datomics=disabled",
-    "-Dstack_check=disabled",
+    # Only worth its cost where the host offers the runtime a small stack.
+    { value = "-Dstack_check=disabled", when = "machine.os != 'none'" },
+    { value = "-Dstack_check=enabled", when = "machine.os == 'none'" },
     { value = "-Dstack_mode=optimize", when = "machine.os == 'none'" },
 ]
 
