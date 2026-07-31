@@ -46,7 +46,7 @@ url = "https://github.com/frida/zlib.git"
 
 [libffi]
 name = "libffi"
-version = "c06a577933f07c76c3f536c9e4ba0f7d9c1e8c4d"
+version = "7e1c2c07f65fd4d8384aa26c8e9a8231e3c2e11f"
 url = "https://github.com/frida/libffi.git"
 options = [
     "-Dexe_static_tramp=false",
@@ -73,7 +73,7 @@ options = [
 
 [glib]
 name = "GLib"
-version = "92d65736b198c2cf131f691dd83db0b25f7b02d2"
+version = "55f5e14d55d563ab599a7da3245be28bf66c122a"
 url = "https://github.com/frida/glib.git"
 options = [
     "-Dcocoa=disabled",
@@ -364,7 +364,7 @@ options = [
 
 [quickjs]
 name = "QuickJS"
-version = "f48e71e5240106dbca136e60f751e206d15cdb3f"
+version = "e05ed9f327d382f29ac8a854b0c3faa0dff87716"
 url = "https://github.com/frida/quickjs.git"
 options = [
     "-Dlibc=false",
