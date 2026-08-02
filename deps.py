@@ -484,6 +484,12 @@ class Builder:
             if extra_ldflags:
                 menv["LDFLAGS"] = shlex.join(extra_ldflags + shlex.split(menv.get("LDFLAGS", "")))
 
+        # The soft-float bare-metal target has no libc beside its compiler: picolibc and
+        # the compiler-rt builtins are packages here, so the prefix being filled is also
+        # the sysroot everything built after them compiles against.
+        if self._host_machine.os == "none" and self._host_machine.config == "softfloat":
+            menv["FRIDA_HOST_SYSROOT"] = str(self._get_prefix(self._host_machine))
+
         build_sdk_prefix = None
         host_sdk_prefix = None
 

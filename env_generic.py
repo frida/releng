@@ -208,15 +208,35 @@ def init_machine_config(machine: MachineSpec,
         else:
             common_flags += ARCH_COMMON_FLAGS_UNIX.get(machine.arch, [])
         c_like_flags += ARCH_C_LIKE_FLAGS_UNIX.get(machine.arch, [])
+        bare_softfloat = machine.os == "none" and machine.config == "softfloat"
         if machine.config == "softfloat":
             common_flags += ARCH_SOFTFLOAT_FLAGS_UNIX.get(machine.arch, [])
+            if bare_softfloat:
+                common_flags += [f"--target={machine.cpu_family}-none-elf"]
+                # picolibc is a package like any other here, so the libc lands in the
+                # prefix being filled rather than beside the compiler. Not
+                # -resource-dir: that is where the compiler keeps its own float.h, and
+                # aiming it at the prefix loses that.
+                sysroot = environ.get("FRIDA_HOST_SYSROOT")
+                if sysroot is not None:
+                    common_flags += [f"--sysroot={sysroot}"]
 
         c_like_flags += [
             "-ffunction-sections",
             "-fdata-sections",
         ]
 
-        if linker_flavor.startswith("gnu-"):
+        if bare_softfloat:
+            # The host's GNU ld cannot be told to target this. Name the runtime
+            # ourselves too: clang would look for its own copy beside the compiler,
+            # and the one that matches this ABI is the one in the sysroot.
+            linker_flags += [
+                "-fuse-ld=lld",
+                "-nostdlib",
+                "-lc",
+                "-lclang_rt.builtins",
+            ]
+        elif linker_flavor.startswith("gnu-"):
             linker_flags += ["-static-libgcc"]
             if machine.os != "windows":
                 linker_flags += ["-Wl,-z,noexecstack"]
@@ -226,7 +246,9 @@ def init_machine_config(machine: MachineSpec,
 
         if linker_flavor == "apple":
             linker_flags += ["-Wl,-dead_strip"]
-        else:
+        elif not bare_softfloat:
+            # Would leave a link with no entry point holding on to nothing at all,
+            # and every configure check that links would then trivially pass.
             linker_flags += ["-Wl,--gc-sections"]
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
