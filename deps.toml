@@ -49,7 +49,7 @@ options = [
 # toolchain carries expect d0 and quietly return nonsense.
 when = "machine.os == 'none' and machine.config == 'softfloat'"
 name = "compiler-rt"
-version = "774f849468e79115e7857636bb345065e58cec09"
+version = "ff5eaa8def448f5ed0a2a6cb267bbc40c9920d8f"
 url = "https://github.com/frida/compiler-rt.git"
 dependencies = [
     "picolibc",
