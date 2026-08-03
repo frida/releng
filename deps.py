@@ -79,6 +79,11 @@ def main():
     command.set_defaults(func=lambda args: build(args.bundle, args.build, args.host,
                                                  args.only, args.exclude, args.verbose))
 
+    command = subparsers.add_parser("published", help="query whether prebuilt dependencies are already published")
+    command.add_argument("bundle", **bundle_opt_kwargs)
+    command.add_argument("host", **machine_opt_kwargs)
+    command.set_defaults(func=lambda args: query_published(args.bundle, args.host))
+
     command = subparsers.add_parser("wait", help="wait for prebuilt dependencies if needed")
     command.add_argument("bundle", **bundle_opt_kwargs)
     command.add_argument("host", **machine_opt_kwargs)
@@ -237,14 +242,8 @@ def roll(bundle: Bundle,
     (public_url, filename) = compute_bundle_parameters(bundle, host_machine, version)
 
     # First do a quick check to avoid hitting S3 in most cases.
-    request = urllib.request.Request(public_url)
-    request.get_method = lambda: "HEAD"
-    try:
-        with urllib.request.urlopen(request) as r:
-            return
-    except urllib.request.HTTPError as e:
-        if e.code != 404:
-            raise CommandError("network error") from e
+    if bundle_is_published(public_url):
+        return
 
     s3_url = "s3://build.frida.re/deps/{version}/{filename}".format(version=version, filename=filename)
 
@@ -296,6 +295,12 @@ def build(bundle: Bundle,
         if e.stderr is not None:
             print("\n=== stderr ===\n" + e.stderr, file=sys.stderr)
         sys.exit(1)
+
+
+def query_published(bundle: Bundle, machine: MachineSpec):
+    version = load_dependency_parameters().deps_version
+    (public_url, _) = compute_bundle_parameters(bundle, machine, version)
+    print(str(bundle_is_published(public_url)).lower())
 
 
 class Builder:
@@ -990,6 +995,18 @@ def compute_bundle_parameters(bundle: Bundle,
     filename = f"{bundle.name.lower()}-{os_arch_config}.tar.xz"
     url = BUNDLE_URL.format(version=version, filename=filename)
     return (url, filename)
+
+
+def bundle_is_published(public_url: str) -> bool:
+    request = urllib.request.Request(public_url)
+    request.get_method = lambda: "HEAD"
+    try:
+        with urllib.request.urlopen(request) as r:
+            return True
+    except urllib.request.HTTPError as e:
+        if e.code != 404:
+            raise CommandError("network error") from e
+    return False
 
 
 def load_dependency_parameters() -> DependencyParameters:
