@@ -135,6 +135,8 @@ class CompilerApplication:
             header_files = [Path(item) for item in shlex.split(raw_header_files) if item != "\n"]
             header_files = [h for h in header_files if h.is_relative_to(REPO_ROOT)]
 
+        header_files = exclude_libc_headers(header_files, meson_config, include_cflags)
+
         devkit_header_lines = []
         umbrella_header = header_files[0]
         processed_header_files = {umbrella_header}
@@ -396,6 +398,20 @@ def get_symbols(library, meson_config):
         result.append((kind, name))
 
     return result
+
+
+def exclude_libc_headers(headers, meson_config, include_cflags):
+    sysroot = next((Path(flag[10:]) for flag in meson_config["c"] if flag.startswith("--sysroot=")), None)
+    if sysroot is None:
+        return headers
+
+    # Bare-metal targets get their libc from the SDK, which puts it inside the very
+    # tree everything else is inlined from. It is still the consumer's to provide,
+    # so keep to what came in through an -I of its own.
+    package_dirs = [d for d in infer_include_dirs(include_cflags)
+                    if d.is_relative_to(sysroot) and d != sysroot / "include"]
+    return [h for h in headers
+            if not h.is_relative_to(sysroot) or any([h.is_relative_to(d) for d in package_dirs])]
 
 
 def infer_include_dirs(flags):
