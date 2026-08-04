@@ -235,6 +235,13 @@ def init_machine_config(machine: MachineSpec,
                 "-nostdlib",
                 "-lc",
                 "-lclang_rt.builtins",
+                # Nothing here ends up in an executable, but configure checks do, and
+                # the C library leaves its console and heap bounds to whatever
+                # environment it lands in. Lend them picolibc's own stub host and an
+                # empty heap, so those links fail only over the symbol being checked.
+                "-ldummyhost",
+                "-Wl,--defsym=__heap_start=0",
+                "-Wl,--defsym=__heap_end=0",
             ]
         elif linker_flavor.startswith("gnu-"):
             linker_flags += ["-static-libgcc"]
