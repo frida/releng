@@ -213,11 +213,12 @@ def init_machine_config(machine: MachineSpec,
             common_flags += ARCH_SOFTFLOAT_FLAGS_UNIX.get(machine.arch, [])
             if bare_softfloat:
                 common_flags += [f"--target={machine.cpu_family}-none-elf"]
-                # picolibc is a package like any other here, so the libc lands in the
-                # prefix being filled rather than beside the compiler. Not
+                # picolibc is a package like any other here, so the libc lives in the
+                # SDK rather than beside the compiler. While rolling there is no SDK
+                # yet, and the prefix being filled is what to compile against. Not
                 # -resource-dir: that is where the compiler keeps its own float.h, and
-                # aiming it at the prefix loses that.
-                sysroot = environ.get("FRIDA_HOST_SYSROOT")
+                # aiming it at either of those loses it.
+                sysroot = sdk_prefix if sdk_prefix is not None else environ.get("FRIDA_HOST_SYSROOT")
                 if sysroot is not None:
                     common_flags += [f"--sysroot={sysroot}"]
 
