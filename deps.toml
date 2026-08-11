@@ -424,7 +424,7 @@ dependencies = [
 
 [quickjs]
 name = "QuickJS"
-version = "e05ed9f327d382f29ac8a854b0c3faa0dff87716"
+version = "152f67820f7e7d577bdfd9cff9a876957dda83e8"
 url = "https://github.com/frida/quickjs.git"
 options = [
     "-Dlibc=false",
