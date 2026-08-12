@@ -432,6 +432,10 @@ ARCH_SOFTFLOAT_FLAGS_UNIX = {
         "-mlong-double-64",
         "-mcmodel=kernel",
         "-fcf-protection=branch",
+        # A jump table is reached by an indirect jump, which the compiler marks
+        # notrack and the kernel does not permit, having left NOTRACK_EN clear.
+        # Its own C is compiled this way for the same reason.
+        "-fno-jump-tables",
         "-fno-pic",
     ],
     "arm64": [
