@@ -220,7 +220,14 @@ def init_machine_config(machine: MachineSpec,
                 # aiming it at either of those loses it.
                 sysroot = sdk_prefix if sdk_prefix is not None else environ.get("FRIDA_HOST_SYSROOT")
                 if sysroot is not None:
-                    common_flags += [f"--sysroot={sysroot}"]
+                    # Only clang's bare-metal driver, which it selects for arm64 but
+                    # not for x86_64, searches the sysroot on its own. Spelling both
+                    # paths out covers the targets where it does not.
+                    common_flags += [
+                        f"--sysroot={sysroot}",
+                        "-isystem", f"{sysroot}/include",
+                    ]
+                    linker_flags += [f"-L{sysroot}/lib"]
 
         c_like_flags += [
             "-ffunction-sections",
@@ -403,7 +410,30 @@ ARCH_COMMON_FLAGS_QNX = {
 # registers. x18 and -fno-pic travel with it because the first host needing this is
 # the Linux arm64 kernel, which reserves the former and whose module loader rejects
 # GOT relocations.
+#
+# On x86_64 the same reasoning lands on LLVM's +soft-float, which is the feature
+# Rust's own x86_64-unknown-none turns on — the two halves have to agree on where a
+# double travels. -mno-sse alone does not: it leaves the ABI returning in xmm0 and
+# the compiler then refuses the function outright. There is no driver flag for the
+# feature, hence -Xclang. The rest is what any x86_64 kernel module is built with:
+# no MMX/SSE, no red zone below the stack pointer that an interrupt would clobber,
+# the kernel code model for the top-2GB mapping modules are loaded into, and
+# endbr64 on every address-taken function since CONFIG_X86_KERNEL_IBT faults an
+# indirect call that lands on anything else.
 ARCH_SOFTFLOAT_FLAGS_UNIX = {
+    "x86_64": [
+        "-Xclang", "-target-feature", "-Xclang", "+soft-float",
+        "-mno-mmx",
+        "-mno-sse",
+        "-mno-red-zone",
+        # long double is x87's 80-bit format here, which soft-float has no
+        # lowering for at all: LLVM crashes selecting it rather than calling out
+        # to a builtin. Nothing in this stack wants more than a double.
+        "-mlong-double-64",
+        "-mcmodel=kernel",
+        "-fcf-protection=branch",
+        "-fno-pic",
+    ],
     "arm64": [
         "-mabi=aapcs-soft",
         "-mgeneral-regs-only",
