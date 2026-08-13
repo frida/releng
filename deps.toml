@@ -32,7 +32,7 @@ dependencies = [
 # this flavour is -mabi=aapcs-soft throughout.
 when = "machine.os == 'none' and machine.config == 'softfloat'"
 name = "picolibc"
-version = "dc9ccb08095c0f73960520b72343a5fbe5b3badd"
+version = "d755323372f4abd92a622fd2d80edf1d1c45c548"
 url = "https://github.com/frida/picolibc.git"
 options = [
     "-Dmultilib=false",
