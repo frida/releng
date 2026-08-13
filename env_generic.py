@@ -242,6 +242,7 @@ def init_machine_config(machine: MachineSpec,
             # and the one that matches this ABI is the one in the sysroot.
             linker_flags += [
                 "-fuse-ld=lld",
+                "-Wl,-no-pie",
                 "-nostdlib",
                 "-lc",
                 "-lclang_rt.builtins",
