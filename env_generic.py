@@ -207,12 +207,14 @@ def init_machine_config(machine: MachineSpec,
             common_flags += ARCH_COMMON_FLAGS_QNX.get(machine.arch, [])
         else:
             common_flags += ARCH_COMMON_FLAGS_UNIX.get(machine.arch, [])
-        c_like_flags += ARCH_C_LIKE_FLAGS_UNIX.get(machine.arch, [])
+        if machine.config != "softfloat":
+            c_like_flags += ARCH_C_LIKE_FLAGS_UNIX.get(machine.arch, [])
         bare_softfloat = machine.os == "none" and machine.config == "softfloat"
         if machine.config == "softfloat":
             common_flags += ARCH_SOFTFLOAT_FLAGS_UNIX.get(machine.arch, [])
             if bare_softfloat:
-                common_flags += [f"--target={machine.cpu_family}-none-elf"]
+                target_arch = BARE_TARGET_ARCHS.get(machine.arch, machine.cpu_family)
+                common_flags += [f"--target={target_arch}-none-elf"]
                 # picolibc is a package like any other here, so the libc lives in the
                 # SDK rather than beside the compiler. While rolling there is no SDK
                 # yet, and the prefix being filled is what to compile against. Not
@@ -221,8 +223,8 @@ def init_machine_config(machine: MachineSpec,
                 sysroot = sdk_prefix if sdk_prefix is not None else environ.get("FRIDA_HOST_SYSROOT")
                 if sysroot is not None:
                     # Only clang's bare-metal driver, which it selects for arm64 but
-                    # not for x86_64, searches the sysroot on its own. Spelling both
-                    # paths out covers the targets where it does not.
+                    # not for the x86 targets, searches the sysroot on its own.
+                    # Spelling both paths out covers the targets where it does not.
                     common_flags += [
                         f"--sysroot={sysroot}",
                         "-isystem", f"{sysroot}/include",
@@ -406,6 +408,17 @@ ARCH_COMMON_FLAGS_QNX = {
     ],
 }
 
+X86_SOFTFLOAT_FLAGS_UNIX = [
+    "-Xclang", "-target-feature", "-Xclang", "+soft-float",
+    "-mno-mmx",
+    "-mno-sse",
+    # long double is x87's 80-bit format here, which soft-float has no
+    # lowering for at all: LLVM crashes selecting it rather than calling out
+    # to a builtin. Nothing in this stack wants more than a double.
+    "-mlong-double-64",
+    "-fno-pic",
+]
+
 # AAPCS64 mandates hardware FP, so only clang can pass doubles in general-purpose
 # registers. x18 and -fno-pic travel with it because the first host needing this is
 # the Linux arm64 kernel, which reserves the former and whose module loader rejects
@@ -421,22 +434,15 @@ ARCH_COMMON_FLAGS_QNX = {
 # endbr64 on every address-taken function since CONFIG_X86_KERNEL_IBT faults an
 # indirect call that lands on anything else.
 ARCH_SOFTFLOAT_FLAGS_UNIX = {
-    "x86_64": [
-        "-Xclang", "-target-feature", "-Xclang", "+soft-float",
-        "-mno-mmx",
-        "-mno-sse",
+    "x86": X86_SOFTFLOAT_FLAGS_UNIX,
+    "x86_64": X86_SOFTFLOAT_FLAGS_UNIX + [
         "-mno-red-zone",
-        # long double is x87's 80-bit format here, which soft-float has no
-        # lowering for at all: LLVM crashes selecting it rather than calling out
-        # to a builtin. Nothing in this stack wants more than a double.
-        "-mlong-double-64",
         "-mcmodel=kernel",
         "-fcf-protection=branch",
         # A jump table is reached by an indirect jump, which the compiler marks
         # notrack and the kernel does not permit, having left NOTRACK_EN clear.
         # Its own C is compiled this way for the same reason.
         "-fno-jump-tables",
-        "-fno-pic",
     ],
     "arm64": [
         "-mabi=aapcs-soft",
@@ -444,6 +450,10 @@ ARCH_SOFTFLOAT_FLAGS_UNIX = {
         "-ffixed-x18",
         "-fno-pic",
     ],
+}
+
+BARE_TARGET_ARCHS = {
+    "x86": "i686",
 }
 
 ARCH_C_LIKE_FLAGS_UNIX = {
