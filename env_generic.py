@@ -180,6 +180,18 @@ def init_machine_config(machine: MachineSpec,
 
     if cc is None:
         suffix = ":\n" + diagnostics if diagnostics is not None else ""
+        if machine.os == "none" and diagnostics is None:
+            if triplet is not None:
+                suffix = f"\n\nLooked for {triplet}-gcc and the rest of that toolchain on PATH."
+            else:
+                suffix = "".join([
+                    "\n\nNothing names one for a bare-metal target. Either say which to use:",
+                    "\n\n    CC=clang CXX=clang++ AR=llvm-ar RANLIB=llvm-ranlib NM=llvm-nm \\",
+                    "\n        STRIP=llvm-strip OBJCOPY=llvm-objcopy READELF=llvm-readelf \\",
+                    "\n        ./releng/deps.py build --bundle=sdk --host=" + machine.identifier,
+                    "\n\nor pass --host=<triplet> with that toolchain on PATH, which is looked",
+                    "\nup as <triplet>-gcc, <triplet>-nm, and so on.",
+                ])
         raise CompilerNotFoundError("no C compiler found" + suffix)
 
     if "cpp" not in binaries:
