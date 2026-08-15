@@ -142,6 +142,14 @@ class MachineSpec:
         return "-".join(parts)
 
     @property
+    def config_is_softfloat(self) -> bool:
+        return self.config in SOFTFLOAT_CONFIGS
+
+    @property
+    def config_is_msabi(self) -> bool:
+        return self.config == "softfloat_msabi"
+
+    @property
     def config_is_optimized(self) -> bool:
         if self.toolchain_is_msvc:
             return self.config in {"md", "mt"}
@@ -407,3 +415,5 @@ PROCESSOR_ARCHITECTURE_ARM64 = 12
 
 IMAGE_FILE_MACHINE_AMD64 = 0x8664
 IMAGE_FILE_MACHINE_ARM64 = 0xAA64
+
+SOFTFLOAT_CONFIGS = {"softfloat", "softfloat_msabi"}

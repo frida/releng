@@ -12,6 +12,12 @@ from .machine_file import strv_to_meson
 from .machine_spec import MachineSpec
 
 
+def target_abi_of(machine: MachineSpec) -> Optional[str]:
+    if machine.config_is_msabi:
+        return "microsoft"
+    return None
+
+
 def init_machine_config(machine: MachineSpec,
                         build_machine: MachineSpec,
                         is_cross_build: bool,
@@ -32,7 +38,8 @@ def init_machine_config(machine: MachineSpec,
     options["c_link_args"] = "linker_flags"
     options["cpp_link_args"] = "linker_flags + cxx_link_flags"
     options["b_lundef"] = str(not allow_undefined_symbols).lower()
-    if machine.config == "softfloat":
+    softfloat = machine.config_is_softfloat
+    if softfloat:
         options["b_staticpic"] = "false"
 
     binaries = config["binaries"]
@@ -207,11 +214,16 @@ def init_machine_config(machine: MachineSpec,
             common_flags += ARCH_COMMON_FLAGS_QNX.get(machine.arch, [])
         else:
             common_flags += ARCH_COMMON_FLAGS_UNIX.get(machine.arch, [])
-        if machine.config != "softfloat":
+        if not softfloat:
             c_like_flags += ARCH_C_LIKE_FLAGS_UNIX.get(machine.arch, [])
-        bare_softfloat = machine.os == "none" and machine.config == "softfloat"
-        if machine.config == "softfloat":
+        bare_softfloat = machine.os == "none" and softfloat
+        if softfloat:
             common_flags += ARCH_SOFTFLOAT_FLAGS_UNIX.get(machine.arch, [])
+            common_flags += BARE_ADDRESSING[machine.config]
+            model = BARE_CODE_MODELS.get(machine.config)
+            if machine.arch == "x86_64" and model is not None:
+                common_flags += [f"-mcmodel={model}"]
+
             if bare_softfloat:
                 target_arch = BARE_TARGET_ARCHS.get(machine.arch, machine.cpu_family)
                 common_flags += [f"--target={target_arch}-none-elf"]
@@ -272,7 +284,7 @@ def init_machine_config(machine: MachineSpec,
             linker_flags += ["-Wl,--icf=all"]
 
         # newlib's syscall stubs; the soft-float flavour brings picolibc instead.
-        if machine.os == "none" and machine.config != "softfloat":
+        if machine.os == "none" and not softfloat:
             linker_flags += ["-specs=nosys.specs"]
 
     constants = config["constants"]
@@ -417,13 +429,11 @@ X86_SOFTFLOAT_FLAGS_UNIX = [
     # lowering for at all: LLVM crashes selecting it rather than calling out
     # to a builtin. Nothing in this stack wants more than a double.
     "-mlong-double-64",
-    "-fno-pic",
 ]
 
 # AAPCS64 mandates hardware FP, so only clang can pass doubles in general-purpose
-# registers. x18 and -fno-pic travel with it because the first host needing this is
-# the Linux arm64 kernel, which reserves the former and whose module loader rejects
-# GOT relocations.
+# registers. x18 travels with it because the first host needing this is the Linux
+# arm64 kernel, which reserves it.
 #
 # On x86_64 the same reasoning lands on LLVM's +soft-float, which is the feature
 # Rust's own x86_64-unknown-none turns on — the two halves have to agree on where a
@@ -431,14 +441,12 @@ X86_SOFTFLOAT_FLAGS_UNIX = [
 # the compiler then refuses the function outright. There is no driver flag for the
 # feature, hence -Xclang. The rest is what any x86_64 kernel module is built with:
 # no MMX/SSE, no red zone below the stack pointer that an interrupt would clobber,
-# the kernel code model for the top-2GB mapping modules are loaded into, and
-# endbr64 on every address-taken function since CONFIG_X86_KERNEL_IBT faults an
+# and endbr64 on every address-taken function since CONFIG_X86_KERNEL_IBT faults an
 # indirect call that lands on anything else.
 ARCH_SOFTFLOAT_FLAGS_UNIX = {
     "x86": X86_SOFTFLOAT_FLAGS_UNIX,
     "x86_64": X86_SOFTFLOAT_FLAGS_UNIX + [
         "-mno-red-zone",
-        "-mcmodel=kernel",
         "-fcf-protection=branch",
         # A jump table is reached by an indirect jump, which the compiler marks
         # notrack and the kernel does not permit, having left NOTRACK_EN clear.
@@ -449,8 +457,16 @@ ARCH_SOFTFLOAT_FLAGS_UNIX = {
         "-mabi=aapcs-soft",
         "-mgeneral-regs-only",
         "-ffixed-x18",
-        "-fno-pic",
     ],
+}
+
+BARE_ADDRESSING = {
+    "softfloat": ["-fno-pic"],
+    "softfloat_msabi": ["-fPIC"],
+}
+
+BARE_CODE_MODELS = {
+    "softfloat": "kernel",
 }
 
 BARE_TARGET_ARCHS = {

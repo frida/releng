@@ -30,7 +30,7 @@ dependencies = [
 # The C library for the soft-float bare-metal target. The plain none-arm64 SDK gets
 # newlib from its GCC toolchain, but newlib has no soft-float build for arm64, and
 # this flavour is -mabi=aapcs-soft throughout.
-when = "machine.os == 'none' and machine.config == 'softfloat'"
+when = "machine.os == 'none' and machine.config_is_softfloat"
 name = "picolibc"
 version = "d755323372f4abd92a622fd2d80edf1d1c45c548"
 url = "https://github.com/frida/picolibc.git"
@@ -47,7 +47,7 @@ options = [
 # The compiler runtime to go with it. Under -mabi=aapcs-soft a double is passed in
 # x0, so __muldf3 and the rest have to be the soft-float ones; the copies Rust's
 # toolchain carries expect d0 and quietly return nonsense.
-when = "machine.os == 'none' and machine.config == 'softfloat'"
+when = "machine.os == 'none' and machine.config_is_softfloat"
 name = "compiler-rt"
 version = "ff5eaa8def448f5ed0a2a6cb267bbc40c9920d8f"
 url = "https://github.com/frida/compiler-rt.git"
@@ -69,8 +69,8 @@ name = "libiconv"
 version = "bbbf4561da4847bf95ce9458da76e072b77cabd1"
 url = "https://github.com/frida/libiconv.git"
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -79,8 +79,8 @@ name = "zlib"
 version = "171a3eacaea8b731ef1fc586e7777b77742e2a1d"
 url = "https://github.com/frida/zlib.git"
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -93,8 +93,8 @@ options = [
     "-Dtests=false",
 ]
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -107,8 +107,8 @@ options = [
     "-Dtest=false",
 ]
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -200,8 +200,8 @@ name = "LZFSE"
 version = "5cfb7c86919d3c2c636d0d7552b51855a611ba1c"
 url = "https://github.com/frida/lzfse.git"
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -417,8 +417,8 @@ options = [
     "-Dcli=disabled",
 ]
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -436,8 +436,8 @@ options = [
     { value = "-Dstack_mode=optimize", when = "machine.os == 'none'" },
 ]
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
@@ -453,8 +453,8 @@ name = "TinyCC"
 version = "96e338ddfc6b1b409cd557356cadb3cf0d590d7b"
 url = "https://github.com/frida/tinycc.git"
 dependencies = [
-    { id = "picolibc", when = "machine.os == 'none' and machine.config == 'softfloat'" },
-    { id = "compiler-rt", when = "machine.os == 'none' and machine.config == 'softfloat'" },
+    { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
+    { id = "compiler-rt", when = "machine.os == 'none' and machine.config_is_softfloat" },
 ]
 
 
