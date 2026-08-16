@@ -450,7 +450,7 @@ when = """ \
        } \
        """
 name = "TinyCC"
-version = "96e338ddfc6b1b409cd557356cadb3cf0d590d7b"
+version = "ca5ee0114401ddc9b2a689cf36791a48886d4f13"
 url = "https://github.com/frida/tinycc.git"
 dependencies = [
     { id = "picolibc", when = "machine.os == 'none' and machine.config_is_softfloat" },
