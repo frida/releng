@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import platform
 import re
 import subprocess
-from typing import List, Optional
+from typing import FrozenSet, List, Optional
 
 if platform.system() == "Windows":
     import ctypes
@@ -142,12 +142,22 @@ class MachineSpec:
         return "-".join(parts)
 
     @property
+    def config_tags(self) -> FrozenSet[str]:
+        if self.config is None:
+            return frozenset()
+        return frozenset(self.config.split("_"))
+
+    @property
     def config_is_softfloat(self) -> bool:
-        return self.config in SOFTFLOAT_CONFIGS
+        return "softfloat" in self.config_tags
+
+    @property
+    def config_is_pic(self) -> bool:
+        return "pic" in self.config_tags
 
     @property
     def config_is_msabi(self) -> bool:
-        return self.config == "softfloat_msabi"
+        return "msabi" in self.config_tags
 
     @property
     def config_is_optimized(self) -> bool:
@@ -416,4 +426,3 @@ PROCESSOR_ARCHITECTURE_ARM64 = 12
 IMAGE_FILE_MACHINE_AMD64 = 0x8664
 IMAGE_FILE_MACHINE_ARM64 = 0xAA64
 
-SOFTFLOAT_CONFIGS = {"softfloat", "softfloat_msabi"}

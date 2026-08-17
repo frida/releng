@@ -40,7 +40,7 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = str(not allow_undefined_symbols).lower()
     softfloat = machine.config_is_softfloat
     if softfloat:
-        options["b_staticpic"] = "false"
+        options["b_staticpic"] = str(machine.config_is_pic).lower()
 
     binaries = config["binaries"]
     cc = None
@@ -228,15 +228,17 @@ def init_machine_config(machine: MachineSpec,
             common_flags += ARCH_COMMON_FLAGS_UNIX.get(machine.arch, [])
         if not softfloat:
             c_like_flags += ARCH_C_LIKE_FLAGS_UNIX.get(machine.arch, [])
-        bare_softfloat = machine.os == "none" and softfloat
+        bare = machine.os == "none"
         if softfloat:
             common_flags += ARCH_SOFTFLOAT_FLAGS_UNIX.get(machine.arch, [])
-            common_flags += BARE_ADDRESSING[machine.config]
-            model = BARE_CODE_MODELS.get(machine.config)
-            if machine.arch == "x86_64" and model is not None:
-                common_flags += [f"-mcmodel={model}"]
+            common_flags += ["-fPIC"] if machine.config_is_pic else ["-fno-pic"]
+            # A Linux module is mapped into the top 2GB and is built absolute, the kernel
+            # code model saying so. A position-independent image goes where the host puts
+            # it, thus it keeps the default model.
+            if machine.arch == "x86_64" and not machine.config_is_pic:
+                common_flags += ["-mcmodel=kernel"]
 
-            if bare_softfloat:
+            if bare:
                 target_arch = BARE_TARGET_ARCHS.get(machine.arch, machine.cpu_family)
                 common_flags += [f"--target={target_arch}-none-elf"]
                 # picolibc is a package like any other here, so the libc lives in the
@@ -260,7 +262,7 @@ def init_machine_config(machine: MachineSpec,
             "-fdata-sections",
         ]
 
-        if bare_softfloat:
+        if bare:
             # The host's GNU ld cannot be told to target this. Name the runtime
             # ourselves too: clang would look for its own copy beside the compiler,
             # and the one that matches this ABI is the one in the sysroot.
@@ -288,16 +290,12 @@ def init_machine_config(machine: MachineSpec,
 
         if linker_flavor == "apple":
             linker_flags += ["-Wl,-dead_strip"]
-        elif not bare_softfloat:
+        elif not bare:
             # Would leave a link with no entry point holding on to nothing at all,
             # and every configure check that links would then trivially pass.
             linker_flags += ["-Wl,--gc-sections"]
         if linker_flavor == "gnu-gold":
             linker_flags += ["-Wl,--icf=all"]
-
-        # newlib's syscall stubs; the soft-float flavour brings picolibc instead.
-        if machine.os == "none" and not softfloat:
-            linker_flags += ["-specs=nosys.specs"]
 
     constants = config["constants"]
     constants["common_flags"] = strv_to_meson(common_flags)
@@ -470,15 +468,6 @@ ARCH_SOFTFLOAT_FLAGS_UNIX = {
         "-mgeneral-regs-only",
         "-ffixed-x18",
     ],
-}
-
-BARE_ADDRESSING = {
-    "softfloat": ["-fno-pic"],
-    "softfloat_msabi": ["-fPIC"],
-}
-
-BARE_CODE_MODELS = {
-    "softfloat": "kernel",
 }
 
 BARE_TARGET_ARCHS = {

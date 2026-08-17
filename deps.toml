@@ -27,9 +27,8 @@ dependencies = [
 ]
 
 [picolibc]
-# The C library for the soft-float bare-metal target. The plain none-arm64 SDK gets
-# newlib from its GCC toolchain, but newlib has no soft-float build for arm64, and
-# this flavour is -mabi=aapcs-soft throughout.
+# The C library for the bare-metal targets. They are all soft-float, and newlib has
+# no soft-float build for arm64, where the flavor is -mabi=aapcs-soft throughout.
 when = "machine.os == 'none' and machine.config_is_softfloat"
 name = "picolibc"
 version = "d755323372f4abd92a622fd2d80edf1d1c45c548"
