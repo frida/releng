@@ -153,6 +153,9 @@ class CompilerApplication:
         if kit == "frida-core" and machine.os == "android":
             selinux_header = umbrella_header_path.parent / "frida-selinux.h"
             ingest_header(selinux_header, header_files, processed_header_files, devkit_header_lines)
+        if kit == "frida-core" and machine.os not in {"windows", "none"}:
+            for header in query_gio_unix_headers(meson_config):
+                ingest_header(header, header_files, processed_header_files, devkit_header_lines)
         devkit_header = u"".join(devkit_header_lines)
 
         if package.startswith("frida-gum"):
@@ -464,6 +467,13 @@ def is_os_library(path, machine):
 
 def is_meson_build_root(path):
     return (path / "meson-info").is_dir()
+
+
+def query_gio_unix_headers(meson_config):
+    include_dirs = [Path(flag[2:]) for flag in query_pkgconfig_cflags("gio-unix-2.0", meson_config)
+                    if flag.startswith("-I")]
+    candidates = [d / "gio" / "gunixfdmessage.h" for d in include_dirs]
+    return [c for c in candidates if c.exists()]
 
 
 def query_pkgconfig_cflags(package, meson_config):
