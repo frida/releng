@@ -45,11 +45,13 @@ def init_machine_config(machine: MachineSpec,
                  or APPLE_MINIMUM_OS_VERSIONS.get(machine.os_dash_arch,
                                                   APPLE_MINIMUM_OS_VERSIONS[machine.os]))
 
+    building_for_the_kernel = machine.config == "kernel"
+
     target = f"{clang_arch}-apple-{machine.os}{os_minver}"
-    if machine.config is not None:
+    if machine.config is not None and not building_for_the_kernel:
         target += "-" + machine.config
 
-    sdk_name = APPLE_SDKS[machine.os_dash_config]
+    sdk_name = APPLE_SDKS[machine.os if building_for_the_kernel else machine.os_dash_config]
     sdk_path = xcrun("--sdk", sdk_name, "--show-sdk-path")
 
     use_static_libcxx = sdk_prefix is not None \
@@ -88,11 +90,31 @@ def init_machine_config(machine: MachineSpec,
     linker_flags = ["-Wl,-dead_strip"]
     linker_flags += read_envflags("LDFLAGS")
 
-    constants = config["constants"]
-    constants["common_flags"] = strv_to_meson([
+    common_flags = [
         "-target", target,
         "-isysroot", sdk_path,
-    ])
+    ]
+    if building_for_the_kernel:
+        common_flags += [
+            "-mkernel",
+            "-nostdlibinc",
+            "-fno-builtin",
+            "-fno-common",
+        ]
+        sysroot = sdk_prefix if sdk_prefix is not None else environ.get("FRIDA_HOST_SYSROOT")
+        if sysroot is not None:
+            common_flags += ["-isystem", f"{sysroot}/include"]
+            linker_flags += [f"-L{sysroot}/lib"]
+        linker_flags += [
+            "-nostdlib",
+            "-static",
+            "-Wl,-e,_main",
+            "-lc",
+            "-lm",
+        ]
+
+    constants = config["constants"]
+    constants["common_flags"] = strv_to_meson(common_flags)
     constants["c_like_flags"] = strv_to_meson(c_like_flags)
     constants["linker_flags"] = strv_to_meson(linker_flags)
 

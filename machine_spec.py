@@ -191,7 +191,13 @@ class MachineSpec:
         return self.os in {"macos", "ios", "watchos", "tvos", "xros"}
 
     @property
+    def is_freestanding(self) -> bool:
+        return self.os == "none" or self.config == "kernel"
+
+    @property
     def system(self) -> str:
+        if self.config == "kernel":
+            return "none"
         return "darwin" if self.is_apple else self.os
 
     @property
