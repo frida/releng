@@ -207,7 +207,7 @@ dependencies = [
 [minizip-ng]
 when = "not machine.is_freestanding"
 name = "minizip-ng"
-version = "dfc1ccc070ff7bb50726c80215cac515253a8ba0"
+version = "3a87bc9dedd9d1ece0845632a80d6c359e750d75"
 url = "https://github.com/frida/minizip-ng.git"
 options = [
     "-Dzlib=enabled",
