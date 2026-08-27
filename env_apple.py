@@ -100,6 +100,7 @@ def init_machine_config(machine: MachineSpec,
             "-nostdlibinc",
             "-fno-builtin",
             "-fno-common",
+            "-fno-ptrauth-calls",
         ]
         sysroot = sdk_prefix if sdk_prefix is not None else environ.get("FRIDA_HOST_SYSROOT")
         if sysroot is not None:
