@@ -288,7 +288,7 @@ def init_machine_config(machine: MachineSpec,
                 linker_flags += ["-Wl,-z,relro"]
             cxx_link_flags += ["-static-libstdc++"]
 
-        if linker_flavor == "apple":
+        if linker_flavor == "apple" and not bare:
             linker_flags += ["-Wl,-dead_strip"]
         elif not bare:
             # Would leave a link with no entry point holding on to nothing at all,
