@@ -48,7 +48,7 @@ options = [
 # toolchain carries expect d0 and quietly return nonsense.
 when = "machine.is_freestanding"
 name = "compiler-rt"
-version = "ff5eaa8def448f5ed0a2a6cb267bbc40c9920d8f"
+version = "15e5d07a1647bc63fa1938164e76f5550a1bdcca"
 url = "https://github.com/frida/compiler-rt.git"
 dependencies = [
     "picolibc",
