@@ -240,7 +240,8 @@ def init_machine_config(machine: MachineSpec,
 
             if bare:
                 target_arch = BARE_TARGET_ARCHS.get(machine.arch, machine.cpu_family)
-                common_flags += [f"--target={target_arch}-none-elf"]
+                target_env = BARE_TARGET_ENVIRONMENTS.get(machine.arch, "elf")
+                common_flags += [f"--target={target_arch}-none-{target_env}"]
                 # picolibc is a package like any other here, so the libc lives in the
                 # SDK rather than beside the compiler. While rolling there is no SDK
                 # yet, and the prefix being filled is what to compile against. Not
@@ -468,10 +469,22 @@ ARCH_SOFTFLOAT_FLAGS_UNIX = {
         "-mgeneral-regs-only",
         "-ffixed-x18",
     ],
+    "arm": [
+        "-march=armv7-a",
+        "-mcpu=cortex-a7",
+        "-mthumb",
+        "-mfloat-abi=soft",
+        "-mfpu=none",
+    ],
 }
 
 BARE_TARGET_ARCHS = {
     "x86": "i686",
+    "arm": "armv7a",
+}
+
+BARE_TARGET_ENVIRONMENTS = {
+    "arm": "eabi",
 }
 
 ARCH_C_LIKE_FLAGS_UNIX = {
