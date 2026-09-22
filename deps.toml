@@ -86,7 +86,7 @@ dependencies = [
 
 [libffi]
 name = "libffi"
-version = "2b42587b9b5c8f4ab4144b615014e20d9e4d396f"
+version = "3fe3257235cc9ffd192e1cd567f1bdfff751fa3e"
 url = "https://github.com/frida/libffi.git"
 options = [
     "-Dexe_static_tramp=false",
