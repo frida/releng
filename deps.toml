@@ -310,7 +310,7 @@ dependencies = [
 [usrsctp]
 when = "not machine.is_freestanding"
 name = "usrsctp"
-version = "377fecfe06bb766c69cc0e1e1f6d5c72cf7704e6"
+version = "57b8b42abad9b00861f92281f013830bbbd0b5f0"
 url = "https://github.com/frida/usrsctp.git"
 options = [
     "-Dsctp_inet=false",
