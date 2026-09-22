@@ -479,6 +479,7 @@ when = """ \
        and not machine.arch.startswith('mips') \
        and not machine.arch.startswith('powerpc') \
        and machine.os not in {'none', 'qnx'} \
+       and machine.config != 'prospero' \
        and not machine.is_freestanding \
        """
 name = "V8"
