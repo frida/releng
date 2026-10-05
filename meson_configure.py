@@ -15,7 +15,7 @@ SCRIPTS_DIR = RELENG_DIR / "meson-scripts"
 
 sys.path.insert(0, str(RELENG_DIR / "meson"))
 import mesonbuild.interpreter
-from mesonbuild.coredata import UserArrayOption, UserBooleanOption, \
+from mesonbuild.options import OptionStore, UserArrayOption, UserBooleanOption, \
         UserComboOption, UserFeatureOption, UserOption, UserStringOption
 
 from . import deps, env, env_apple
@@ -348,7 +348,7 @@ def generate_out_of_tree_make_bat(sourcedir: Path) -> str:
 
 
 def register_meson_options(meson_option_file: Path, group: argparse._ArgumentGroup):
-    interpreter = mesonbuild.optinterpreter.OptionInterpreter(subproject="")
+    interpreter = mesonbuild.optinterpreter.OptionInterpreter(OptionStore(is_cross=False), subproject="")
     interpreter.process(meson_option_file)
 
     for key, opt in interpreter.options.items():
@@ -411,7 +411,7 @@ def parse_option_meta(name: str,
         metavar = name.upper()
     elif isinstance(opt, UserArrayOption):
         default_value = ",".join(opt.value)
-        metavar = "{" + ",".join(opt.choices) + "}"
+        metavar = "{" + ",".join(opt.choices) + "}" if opt.choices else name.upper()
     elif isinstance(opt, UserComboOption):
         default_value = opt.value
         metavar = "{" + "|".join(opt.choices) + "}"
