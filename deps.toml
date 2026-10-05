@@ -55,7 +55,6 @@ dependencies = [
     "picolibc",
 ]
 
-
 [libiconv]
 # Needed on non-Windows systems where iconv is not part of the libc.
 # On Apple OSes we include it in SDKs to avoid dependencies beyond libSystem.
@@ -73,7 +72,6 @@ dependencies = [
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
 
-
 [zlib]
 name = "zlib"
 version = "171a3eacaea8b731ef1fc586e7777b77742e2a1d"
@@ -82,7 +80,6 @@ dependencies = [
     { id = "picolibc", when = "machine.is_freestanding" },
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
-
 
 [libffi]
 name = "libffi"
@@ -97,7 +94,6 @@ dependencies = [
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
 
-
 [pcre2]
 name = "PCRE2"
 version = "b47486922fdc3486499b310dc9cf903449700474"
@@ -110,7 +106,6 @@ dependencies = [
     { id = "picolibc", when = "machine.is_freestanding" },
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
-
 
 [selinux]
 when = "machine.os == 'android' and not machine.is_freestanding"
@@ -204,7 +199,6 @@ dependencies = [
     { id = "picolibc", when = "machine.is_freestanding" },
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
-
 
 [minizip-ng]
 when = "not machine.is_freestanding"
@@ -425,7 +419,6 @@ dependencies = [
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
 
-
 [quickjs]
 name = "QuickJS"
 version = "247bfdcbd3c58171af060351d7587541d05989fd"
@@ -444,7 +437,6 @@ dependencies = [
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
 
-
 [tinycc]
 when = """ \
        machine.arch in { \
@@ -460,7 +452,6 @@ dependencies = [
     { id = "picolibc", when = "machine.is_freestanding" },
     { id = "compiler-rt", when = "machine.is_freestanding" },
 ]
-
 
 [openssl]
 when = "not machine.is_freestanding"
