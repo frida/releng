@@ -284,6 +284,10 @@ when = "machine.os in {'windows', 'macos', 'linux'} and not machine.is_freestand
 name = "libusb"
 version = "23d5a2cdc55aa4f0895960d08528e5aa13e7f7e2"
 url = "https://github.com/frida/libusb.git"
+options = [
+    "-Dexamples=disabled",
+    "-Dtests=disabled",
+]
 
 [lwip]
 when = "not machine.is_freestanding"
