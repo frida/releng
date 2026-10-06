@@ -244,6 +244,7 @@ options = [
     "-Dmsabi_support=false",
     "-Dminidebuginfo=enabled",
     "-Dzlibdebuginfo=enabled",
+    "-Dtests=disabled",
 ]
 dependencies = [
     "zlib",
