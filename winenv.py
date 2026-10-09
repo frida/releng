@@ -76,7 +76,7 @@ def detect_msvs_tool_path(machine: MachineSpec,
                           build_machine: MachineSpec,
                           tool: str,
                           toolchain_prefix: Optional[Path]) -> Path:
-    return detect_msvc_tool_dir(toolchain_prefix) / "bin" / f"Host{build_machine.msvc_platform}" \
+    return detect_msvc_tool_dir(toolchain_prefix) / "bin" / f"Host{msvc_host_platform(build_machine)}" \
             / machine.msvc_platform / tool
 
 
@@ -84,7 +84,7 @@ def detect_msvs_runtime_path(machine: MachineSpec,
                              build_machine: MachineSpec,
                              toolchain_prefix: Optional[Path]) -> List[Path]:
     msvc_platform = machine.msvc_platform
-    native_msvc_platform = build_machine.msvc_platform
+    native_msvc_platform = msvc_host_platform(build_machine)
 
     msvc_dir = detect_msvc_tool_dir(toolchain_prefix)
     msvc_bindir = msvc_dir / "bin" / f"Host{native_msvc_platform}" / msvc_platform
@@ -97,6 +97,13 @@ def detect_msvs_runtime_path(machine: MachineSpec,
     winsdk_bindir = winsdk_dir / "Bin" / winsdk_version / msvc_platform
 
     return [winsdk_bindir, msvc_bindir] + msvc_dll_dirs
+
+
+def msvc_host_platform(build_machine: MachineSpec) -> str:
+    if build_machine.arch == "x86" and os.environ.get("PROCESSOR_ARCHITEW6432",
+                                                      os.environ.get("PROCESSOR_ARCHITECTURE")) == "AMD64":
+        return "x64"
+    return build_machine.msvc_platform
 
 
 def detect_msvs_include_path(toolchain_prefix: Optional[Path]) -> List[Path]:
