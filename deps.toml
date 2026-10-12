@@ -127,6 +127,7 @@ options = [
     "-Dlibmount=disabled",
     "-Dtests=false",
     "--force-fallback-for=pcre",
+    { value = "-Dsysprof=disabled", when = "machine.os == 'qnx'" },
     { value = "-Ddiet=true", when = "machine.is_freestanding" },
     { value = "-Dglib_debug=disabled", when = "machine.config_is_optimized" },
     { value = "-Dglib_assert=false", when = "machine.config_is_optimized" },
