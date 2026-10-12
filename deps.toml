@@ -368,7 +368,7 @@ options = [
 ]
 
 [ngtcp2]
-when = "not machine.is_freestanding"
+when = "not machine.is_freestanding and machine.os != 'qnx'"
 name = "ngtcp2"
 version = "0009518d5ac5e4ce80343fb5f3c719991ffd47af"
 url = "https://github.com/frida/ngtcp2.git"
