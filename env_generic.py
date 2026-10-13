@@ -336,6 +336,10 @@ def resolve_gcc_binaries(toolprefix: str = "") -> Tuple[List[str], Dict[str, str
 
         binaries[identifier] = strv_to_meson([val]) + extra
 
+    windres = shutil.which(toolprefix + "windres")
+    if windres is not None:
+        binaries["windres"] = strv_to_meson([windres])
+
     return (cc, binaries)
 
 
