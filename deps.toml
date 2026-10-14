@@ -488,6 +488,7 @@ options = [
     "-Dpointer_compression=disabled",
     "-Dcppgc_caged_heap=disabled",
 ]
+job_memory = 4
 dependencies = [
     "zlib",
     { id = "zlib", for_machine = "build" },

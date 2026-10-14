@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import base64
+import ctypes
 from configparser import ConfigParser
 import dataclasses
 from dataclasses import dataclass, field
@@ -593,6 +594,11 @@ class Builder:
                          cwd=sourcedir,
                          **meson_kwargs)
 
+        if pkg.job_memory is not None:
+            self._call_meson(["compile", "-j", str(compute_job_count(pkg.job_memory))],
+                             cwd=builddir,
+                             **meson_kwargs)
+
         self._call_meson(["install"],
                          cwd=builddir,
                          **meson_kwargs)
@@ -1024,7 +1030,8 @@ def load_dependency_parameters() -> DependencyParameters:
                                            list(map(parse_option, pkg.get("options", []))),
                                            list(map(parse_dependency, pkg.get("dependencies", []))),
                                            pkg.get("scope"),
-                                           pkg.get("when"))
+                                           pkg.get("when"),
+                                           pkg.get("job_memory"))
 
     p = config["dependencies"]
     return DependencyParameters(p["version"], p["bootstrap_version"], packages)
@@ -1095,6 +1102,31 @@ def parse_dependency(v: Union[str, dict]) -> OptionSpec:
     return DependencySpec(v["id"], v.get("for_machine"), v.get("when"))
 
 
+def compute_job_count(gib_per_job: int) -> int:
+    return max(1, min(os.cpu_count() + 2, query_physical_memory() // (gib_per_job << 30)))
+
+
+def query_physical_memory() -> int:
+    if os.name == "nt":
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_uint32),
+                ("dwMemoryLoad", ctypes.c_uint32),
+                ("ullTotalPhys", ctypes.c_uint64),
+                ("ullAvailPhys", ctypes.c_uint64),
+                ("ullTotalPageFile", ctypes.c_uint64),
+                ("ullAvailPageFile", ctypes.c_uint64),
+                ("ullTotalVirtual", ctypes.c_uint64),
+                ("ullAvailVirtual", ctypes.c_uint64),
+                ("ullAvailExtendedVirtual", ctypes.c_uint64),
+            ]
+        status = MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(status)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))
+        return status.ullTotalPhys
+    return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+
+
 def copy_files(fromdir: Path,
                files: List[Path],
                todir: Path):
@@ -1151,6 +1183,7 @@ class PackageSpec:
     dependencies: List[DependencySpec] = field(default_factory=list)
     scope: Optional[str] = None
     when: Optional[str] = None
+    job_memory: Optional[int] = None
 
 
 @dataclass
