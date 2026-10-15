@@ -10,6 +10,7 @@ from enum import Enum
 import graphlib
 import itertools
 import json
+import lzma
 import os
 from pathlib import Path
 import re
@@ -185,48 +186,61 @@ def sync(bundle: Bundle,
     local_bundle = location.parent / filename
     if local_bundle.exists():
         on_progress(Progress("Deploying local {}".format(bundle_nick)))
-        archive_path = local_bundle
-        archive_is_temporary = False
-    else:
+        extract_bundle(local_bundle, location)
+        return state
+
+    attempt = 1
+    while True:
         if bundle == Bundle.SDK:
             on_progress(Progress(f"Downloading SDK {version} for {machine.identifier}"))
         else:
             on_progress(Progress(f"Downloading {bundle_nick} {version}"))
+        archive_path = download_bundle(url)
         try:
-            with urllib.request.urlopen(url) as response, \
-                    tempfile.NamedTemporaryFile(delete=False) as archive:
-                shutil.copyfileobj(response, archive)
-                archive_path = Path(archive.name)
-                archive_is_temporary = True
             on_progress(Progress(f"Extracting {bundle_nick}"))
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                raise BundleNotFoundError(f"missing bundle at {url}") from e
-            raise e
-
-    try:
-        staging_dir = location.parent / f"_{location.name}"
-        if staging_dir.exists():
-            shutil.rmtree(staging_dir)
-        staging_dir.mkdir(parents=True)
-
-        with tarfile.open(archive_path, "r:xz") as tar:
-            tar.extractall(staging_dir)
-
-        suffix_len = len(".frida.in")
-        raw_location = location.as_posix()
-        for f in staging_dir.rglob("*.frida.in"):
-            target = f.parent / f.name[:-suffix_len]
-            f.write_text(f.read_text(encoding="utf-8").replace("@FRIDA_TOOLROOT@", raw_location),
-                         encoding="utf-8")
-            f.rename(target)
-
-        staging_dir.rename(location)
-    finally:
-        if archive_is_temporary:
+            extract_bundle(archive_path, location)
+            break
+        except (EOFError, lzma.LZMAError, tarfile.ReadError):
+            if attempt == BUNDLE_DOWNLOAD_ATTEMPTS:
+                raise
+            on_progress(Progress(f"Retrying truncated {bundle_nick}"))
+            attempt += 1
+        finally:
             archive_path.unlink()
 
     return state
+
+
+def download_bundle(url: str) -> Path:
+    try:
+        with urllib.request.urlopen(url) as response, \
+                tempfile.NamedTemporaryFile(delete=False) as archive:
+            shutil.copyfileobj(response, archive)
+            return Path(archive.name)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise BundleNotFoundError(f"missing bundle at {url}") from e
+        raise e
+
+
+def extract_bundle(archive_path: Path, location: Path):
+    staging_dir = location.parent / f"_{location.name}"
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
+    staging_dir.mkdir(parents=True)
+
+    with tarfile.open(archive_path, "r:xz") as tar:
+        tar.extractall(staging_dir)
+
+    suffix_len = len(".frida.in")
+    raw_location = location.as_posix()
+    for f in staging_dir.rglob("*.frida.in"):
+        target = f.parent / f.name[:-suffix_len]
+        f.write_text(f.read_text(encoding="utf-8").replace("@FRIDA_TOOLROOT@", raw_location),
+                     encoding="utf-8")
+        f.rename(target)
+
+    staging_dir.rename(location)
 
 
 def roll(bundle: Bundle,
@@ -1150,6 +1164,7 @@ class CommandError(Exception):
 DEPS_TOML_PATH = RELENG_DIR / "deps.toml"
 
 BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
+BUNDLE_DOWNLOAD_ATTEMPTS = 3
 
 
 class Bundle(Enum):
