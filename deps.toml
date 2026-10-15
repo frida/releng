@@ -390,7 +390,8 @@ url = "https://github.com/frida/libsoup.git"
 options = [
     "-Dgssapi=disabled",
     "-Dntlm=disabled",
-    "-Dbrotli=enabled",
+    "-Dbrotli=disabled",
+    "-Dzstd=disabled",
     "-Dtls_check=false",
     "-Dintrospection=disabled",
     "-Dvapi=disabled",
@@ -404,7 +405,6 @@ dependencies = [
     "nghttp2",
     "sqlite",
     "libpsl",
-    "brotli",
 ]
 
 [capstone]
