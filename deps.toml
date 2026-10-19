@@ -479,7 +479,7 @@ when = """ \
        and not machine.is_freestanding \
        """
 name = "V8"
-version = "741be483d1b04daf828102d6cffcfc6cc29e2003"
+version = "f6d7f6610f2f21e2817ed180b72ea750a3f63ce8"
 url = "https://github.com/frida/v8.git"
 options = [
     "-Ddebug=false",
