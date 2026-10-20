@@ -53,6 +53,18 @@ def main():
         "help": f"os/arch (default: {default_machine})",
         "type": MachineSpec.parse,
     }
+    rebuild_opt_kwargs = {
+        "help": "only build packages A, B, and C, taking the rest from the --base bundle " \
+                "(default: $FRIDA_DEPS_REBUILD)",
+        "metavar": "A,B,C",
+        "type": parse_set_option_value,
+        "default": os.environ.get("FRIDA_DEPS_REBUILD") or None,
+    }
+    base_opt_kwargs = {
+        "help": "version of the bundle to take packages not in --rebuild from (default: $FRIDA_DEPS_BASE)",
+        "metavar": "VERSION",
+        "default": os.environ.get("FRIDA_DEPS_BASE") or None,
+    }
 
     command = subparsers.add_parser("sync", help="ensure prebuilt dependencies are up-to-date")
     command.add_argument("bundle", **bundle_opt_kwargs)
@@ -66,8 +78,11 @@ def main():
     command.add_argument("--build", default=default_machine, **machine_opt_kwargs)
     command.add_argument("--activate", default=False, action='store_true')
     command.add_argument("--post", help="post-processing script")
+    command.add_argument("--rebuild", **rebuild_opt_kwargs)
+    command.add_argument("--base", **base_opt_kwargs)
     command.set_defaults(func=lambda args: roll(args.bundle, args.build, args.host, args.activate,
-                                                Path(args.post) if args.post is not None else None))
+                                                Path(args.post) if args.post is not None else None,
+                                                args.rebuild, args.base))
 
     command = subparsers.add_parser("build", help="build prebuilt dependencies")
     command.add_argument("--bundle", default=Bundle.SDK, **bundle_opt_kwargs)
@@ -77,9 +92,12 @@ def main():
                          type=parse_set_option_value)
     command.add_argument("--exclude", help="exclude packages A, B, and C", metavar="A,B,C",
                          type=parse_set_option_value, default=set())
+    command.add_argument("--rebuild", **rebuild_opt_kwargs)
+    command.add_argument("--base", **base_opt_kwargs)
     command.add_argument("-v", "--verbose", help="be verbose", action="store_true")
     command.set_defaults(func=lambda args: build(args.bundle, args.build, args.host,
-                                                 args.only, args.exclude, args.verbose))
+                                                 args.only, args.exclude, args.rebuild, args.base,
+                                                 args.verbose))
 
     command = subparsers.add_parser("published", help="query whether prebuilt dependencies are already published")
     command.add_argument("bundle", **bundle_opt_kwargs)
@@ -247,7 +265,9 @@ def roll(bundle: Bundle,
          build_machine: MachineSpec,
          host_machine: MachineSpec,
          activate: bool,
-         post: Optional[Path]):
+         post: Optional[Path],
+         rebuild_packages: Optional[Set[str]] = None,
+         base_version: Optional[str] = None):
     params = load_dependency_parameters()
     version = params.deps_version
 
@@ -269,7 +289,9 @@ def roll(bundle: Bundle,
     if r.returncode != 1:
         raise CommandError(f"unable to access S3: {r.stdout.strip()}")
 
-    artifact = build(bundle, build_machine, host_machine)
+    artifact = build(bundle, build_machine, host_machine,
+                     rebuild_packages=rebuild_packages,
+                     base_version=base_version)
 
     if post is not None:
         post_script = RELENG_DIR / post
@@ -299,10 +321,14 @@ def build(bundle: Bundle,
           host_machine: MachineSpec,
           only_packages: Optional[Set[str]] = None,
           excluded_packages: Set[str] = set(),
+          rebuild_packages: Optional[Set[str]] = None,
+          base_version: Optional[str] = None,
           verbose: bool = False) -> Path:
+    check_rebuild_options(rebuild_packages, base_version)
+
     builder = Builder(bundle, build_machine, host_machine, verbose)
     try:
-        return builder.build(only_packages, excluded_packages)
+        return builder.build(only_packages, excluded_packages, rebuild_packages, base_version)
     except subprocess.CalledProcessError as e:
         print(e, file=sys.stderr)
         if e.stdout is not None:
@@ -310,6 +336,15 @@ def build(bundle: Bundle,
         if e.stderr is not None:
             print("\n=== stderr ===\n" + e.stderr, file=sys.stderr)
         sys.exit(1)
+
+
+def check_rebuild_options(rebuild_packages: Optional[Set[str]], base_version: Optional[str]):
+    if (rebuild_packages is None) != (base_version is None):
+        raise CommandError("--rebuild and --base must be used together")
+    if rebuild_packages is not None:
+        unknown = rebuild_packages - load_dependency_parameters().packages.keys()
+        if unknown:
+            raise CommandError(f"unknown package(s): {', '.join(sorted(unknown))}")
 
 
 def query_published(bundle: Bundle, machine: MachineSpec):
@@ -334,6 +369,8 @@ class Builder:
         self._cachedir = detect_cache_dir(ROOT_DIR)
         self._workdir = self._cachedir / "src"
 
+        self._base_version: Optional[str] = None
+
         self._toolchain_prefix: Optional[Path] = None
         self._build_config: Optional[env.MachineConfig] = None
         self._host_config: Optional[env.MachineConfig] = None
@@ -345,7 +382,9 @@ class Builder:
 
     def build(self,
               only_packages: Optional[List[str]],
-              excluded_packages: Set[str]) -> Path:
+              excluded_packages: Set[str],
+              rebuild_packages: Optional[Set[str]] = None,
+              base_version: Optional[str] = None) -> Path:
         started_at = time.time()
         prepare_ended_at = None
         clone_time_elapsed = None
@@ -366,10 +405,31 @@ class Builder:
             selected_packages = {i: p for i, p in selected_packages.items() if i not in excluded_packages}
 
             packages = [selected_packages[i] for i in iterate_package_ids_in_dependency_order(selected_packages.values())]
-            all_deps = itertools.chain.from_iterable([pkg.dependencies for pkg in packages])
+
+            if rebuild_packages is not None:
+                (base_url, _) = compute_bundle_parameters(self._bundle, self._host_machine, base_version)
+                if bundle_is_published(base_url):
+                    self._base_version = base_version
+                else:
+                    self._print_status(base_url, "Not found, building everything")
+
+            if self._base_version is not None:
+                packages_to_build = {i for i in rebuild_packages if i in selected_packages}
+                base_lacks_libraries = self._bundle is Bundle.TOOLCHAIN
+                if base_lacks_libraries:
+                    toplevel_packages = [selected_packages[i] for i in packages_to_build]
+                    packages_to_build = self._resolve_dependencies(toplevel_packages, all_packages).keys() \
+                            & selected_packages.keys()
+            else:
+                packages_to_build = selected_packages.keys()
+
+            all_deps = itertools.chain.from_iterable([pkg.dependencies for pkg in packages
+                                                      if pkg.identifier in packages_to_build])
             deps_for_build_machine = {dep.identifier for dep in all_deps if dep.for_machine == "build"}
 
             self._prepare()
+            if self._base_version is not None:
+                self._deploy_base(packages_to_build)
             prepare_ended_at = time.time()
 
             clone_time_elapsed = 0
@@ -377,14 +437,20 @@ class Builder:
             for pkg in packages:
                 self._print_package_banner(pkg)
 
+                machines = []
+                if pkg.identifier in packages_to_build:
+                    machines += [self._host_machine]
+                if pkg.identifier in deps_for_build_machine:
+                    machines += [self._build_machine]
+                if not machines:
+                    self._print_status(pkg.name, f"Reusing from {self._base_version}")
+                    continue
+
                 t1 = time.time()
                 self._clone_repo_if_needed(pkg)
                 t2 = time.time()
                 clone_time_elapsed += t2 - t1
 
-                machines = [self._host_machine]
-                if pkg.identifier in deps_for_build_machine:
-                    machines += [self._build_machine]
                 self._build_package(pkg, machines)
                 t3 = time.time()
                 build_time_elapsed += t3 - t2
@@ -526,6 +592,27 @@ class Builder:
                                              envdir)
         self._build_env = self._build_config.make_merged_environment(os.environ)
         self._host_env = self._host_config.make_merged_environment(os.environ)
+
+    def _deploy_base(self, packages_to_build: Set[str]):
+        outdir = self._get_outdir()
+        if outdir.exists():
+            shutil.rmtree(outdir)
+
+        prefix = self._get_prefix(self._host_machine)
+        sync(self._bundle, self._host_machine, prefix, self._base_version)
+
+        raw_prefix = prefix.as_posix()
+        for f in prefix.rglob("*.pc"):
+            f.write_text(f.read_text(encoding="utf-8").replace("${frida_sdk_prefix}", raw_prefix),
+                         encoding="utf-8")
+
+        for identifier in packages_to_build:
+            manifest_path = prefix / "manifest" / f"{identifier}.pkg"
+            if not manifest_path.exists():
+                continue
+            for entry in manifest_path.read_text(encoding="utf-8").strip().split("\n"):
+                (prefix / entry).unlink()
+            manifest_path.unlink()
 
     def _clone_repo_if_needed(self, pkg: PackageSpec):
         sourcedir = self._get_sourcedir(pkg)
@@ -798,7 +885,8 @@ class Builder:
         return "share" not in parts
 
     def _get_outdir(self) -> Path:
-        return self._workdir / f"_{self._bundle.name.lower()}.out"
+        flavor = ".partial" if self._base_version is not None else ""
+        return self._workdir / f"_{self._bundle.name.lower()}{flavor}.out"
 
     def _get_sourcedir(self, pkg: PackageSpec) -> Path:
         return self._workdir / pkg.identifier
