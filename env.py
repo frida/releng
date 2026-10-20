@@ -117,7 +117,7 @@ def generate_machine_config(machine: MachineSpec,
                             default_library: DefaultLibrary,
                             outdir: Path,
                             apple_min_os: Optional[Dict[str, str]] = None) -> MachineConfig:
-    config = ConfigParser(dict_type=OrderedDict)
+    config = ConfigParser(dict_type=OrderedDict, interpolation=None)
     config["constants"] = OrderedDict()
     config["binaries"] = OrderedDict()
     config["built-in options"] = OrderedDict()

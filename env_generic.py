@@ -87,7 +87,7 @@ def init_machine_config(machine: MachineSpec,
                                           stderr=subprocess.STDOUT,
                                           encoding=locale.getpreferredencoding())
             if process.returncode == 0:
-                mcfg = ConfigParser()
+                mcfg = ConfigParser(interpolation=None)
                 mcfg.read(machine_file)
 
                 for section in mcfg.sections():

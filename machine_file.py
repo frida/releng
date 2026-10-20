@@ -4,7 +4,7 @@ from typing import Dict, List, Sequence, Union
 
 
 def load(mfile: Path) -> Dict[str, Union[str, List[str]]]:
-    config = ConfigParser()
+    config = ConfigParser(interpolation=None)
     config.read(mfile)
 
     hidden_constants = {
