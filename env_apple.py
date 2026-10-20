@@ -2,7 +2,7 @@ from configparser import ConfigParser
 from pathlib import Path
 import shlex
 import subprocess
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .machine_file import strv_to_meson
 from .machine_spec import MachineSpec
@@ -27,15 +27,22 @@ def init_machine_config(machine: MachineSpec,
         except KeyError:
             raise Xcode11NotFoundError("for arm64eoabi support, XCODE11 must be set to the location of your Xcode 11 app bundle")
 
+    (xcrun_argv, limbo_sysroot) = detect_xcrun(build_machine, environ)
+    if limbo_sysroot is not None:
+        outenv["LIMBO_SYSROOT"] = limbo_sysroot
+
     def xcrun(*args):
         try:
-            return subprocess.run(["xcrun"] + list(args),
+            path = subprocess.run(xcrun_argv + list(args),
                                   env=xcenv,
                                   capture_output=True,
                                   encoding="utf-8",
                                   check=True).stdout.strip()
         except subprocess.CalledProcessError as e:
             raise XCRunError("\n\t| ".join(e.stderr.strip().split("\n")))
+        if limbo_sysroot is not None:
+            return limbo_sysroot + path
+        return path
 
     clang_arch = APPLE_CLANG_ARCHS.get(machine.arch, machine.arch)
 
@@ -147,11 +154,26 @@ def init_machine_config(machine: MachineSpec,
     options["b_lundef"] = "true"
 
 
+def detect_xcrun(build_machine: MachineSpec, environ: Dict[str, str]) -> Tuple[List[str], Optional[str]]:
+    if build_machine.is_apple:
+        return (["xcrun"], None)
+
+    try:
+        sysroot = Path(environ["LIMBO_SYSROOT"]).resolve().as_posix()
+    except KeyError:
+        raise LimboSysrootNotFoundError("to build for Apple OSes on this machine, LIMBO_SYSROOT must be set to the location of your Limbo sysroot")
+    return ([sysroot + "/usr/bin/xcrun"], sysroot)
+
+
 class XCRunError(Exception):
     pass
 
 
 class Xcode11NotFoundError(Exception):
+    pass
+
+
+class LimboSysrootNotFoundError(Exception):
     pass
 
 

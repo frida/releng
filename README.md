@@ -64,3 +64,14 @@ $ sudo apt-get install g++-arm-linux-gnueabihf
 $ ./configure --host=arm-linux-gnueabihf
 $ make
   ```
+
+### Apple OSes from Linux
+
+Install [Limbo](https://github.com/oleavr/limbo) with its binfmt
+handlers and a sysroot containing Xcode, then point releng at the sysroot:
+
+  ```sh
+$ export LIMBO_SYSROOT=$HOME/macos
+$ ./configure --host=macos-arm64e
+$ make
+  ```
