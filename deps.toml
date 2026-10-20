@@ -125,18 +125,18 @@ options = [
     "-Dselinux=disabled",
     "-Dxattr=false",
     "-Dlibmount=disabled",
+    "-Dsysprof=disabled",
     "-Dtests=false",
     "--force-fallback-for=pcre",
-    { value = "-Dsysprof=disabled", when = "machine.os == 'qnx'" },
     { value = "-Ddiet=true", when = "machine.is_freestanding" },
-    { value = "-Dglib_debug=disabled", when = "machine.config_is_optimized" },
-    { value = "-Dglib_assert=false", when = "machine.config_is_optimized" },
-    { value = "-Dglib_checks=false", when = "machine.config_is_optimized" },
     { value = "-Diconv=external", when = """ \
                                          machine.is_apple \
                                          or machine.os in {'android', 'qnx', 'none'} \
                                          or machine.config == 'uclibc' \
-                                         """ }
+                                         """ },
+    { value = "-Dglib_debug=disabled", when = "machine.config_is_optimized" },
+    { value = "-Dglib_assert=false", when = "machine.config_is_optimized" },
+    { value = "-Dglib_checks=false", when = "machine.config_is_optimized" },
 ]
 dependencies = [
     "pcre2",
