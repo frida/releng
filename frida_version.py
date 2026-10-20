@@ -34,6 +34,10 @@ def main(argv: List[str]):
 
 
 def detect(repo: Path) -> FridaVersion:
+    override = os.environ.get("FRIDA_VERSION")
+    if override is not None:
+        return parse(override)
+
     version_name = "0.0.0"
     major = 0
     minor = 0
@@ -71,7 +75,7 @@ def detect(repo: Path) -> FridaVersion:
 
     nano = distance
 
-    m = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", tag_part)
+    m = VERSION_PATTERN.match(tag_part)
     if m is None:
         raise VersionParseError(
             f"Tag does not match expected semver pattern: {tag_part!r}"
@@ -98,9 +102,18 @@ def detect(repo: Path) -> FridaVersion:
     return FridaVersion(version_name, major, minor, micro, nano, commit)
 
 
+def parse(name: str) -> FridaVersion:
+    m = VERSION_PATTERN.match(name)
+    if m is None:
+        raise VersionParseError(f"Version does not match expected semver pattern: {name!r}")
+    return FridaVersion(name, int(m.group(1)), int(m.group(2)), int(m.group(3)), 0, "")
+
+
 class VersionParseError(Exception):
     pass
 
+
+VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$")
 
 if __name__ == "__main__":
     main(sys.argv)
