@@ -1,6 +1,6 @@
 import argparse
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import pickle
 import platform
 import re
@@ -250,6 +250,8 @@ def configure(sourcedir: Path,
 
 
 def parse_prefix(raw_prefix: str) -> Path:
+    if raw_prefix.startswith("/"):
+        return PurePosixPath(raw_prefix)
     prefix = Path(raw_prefix)
     if not prefix.is_absolute():
         prefix = Path(os.getcwd()) / prefix
