@@ -41,7 +41,7 @@ def init_machine_config(machine: MachineSpec,
             raise NdkVersionError(f"NDK r{NDK_REQUIRED} is required (found r{major_version}, which is unsupported)")
 
     android_build_os = "darwin" if build_machine.os == "macos" else build_machine.os
-    android_build_arch = "x86_64" if build_machine.os in {"macos", "linux"} else build_machine.arch
+    android_build_arch = "x86_64" if build_machine.os in {"windows", "macos", "linux"} else build_machine.arch
     android_api = 21
 
     llvm_bindir = ndk_root / "toolchains" / "llvm" / "prebuilt" / f"{android_build_os}-{android_build_arch}" / "bin"
