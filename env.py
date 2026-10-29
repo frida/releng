@@ -335,7 +335,17 @@ def find_usable_system_pkg_config() -> Optional[str]:
     is_strawberry_perl_stub = "Pure-Perl" in helptext
     if is_strawberry_perl_stub:
         return None
+    if not responds_when_libdir_is_set(binary):
+        return None
     return binary
+
+
+def responds_when_libdir_is_set(pkg_config: str) -> bool:
+    version = subprocess.run([pkg_config, "--version"],
+                             capture_output=True,
+                             text=True,
+                             env={**os.environ, "PKG_CONFIG_LIBDIR": os.devnull}).stdout
+    return version.strip() != ""
 
 
 def make_pkg_config_wrapper(pkg_config: List[str], pkg_config_path: List[str], pkg_config_libdir: Optional[str] = None) -> str:
