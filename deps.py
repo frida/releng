@@ -988,11 +988,13 @@ def bump():
     for identifier in iterate_package_ids_in_dependency_order(packages.values()):
         pkg = packages[identifier]
         print(f"# Checking {pkg.name}")
-        assert pkg.url.startswith("https://github.com/frida/"), f"{pkg.url}: unhandled URL"
+        own_repo = try_parse_own_repo_url(pkg.url)
+        assert own_repo is not None, f"{pkg.url}: unhandled URL"
+        organization, repo = own_repo
 
-        bump_wraps(identifier, packages, run)
+        bump_wraps(organization, repo, packages, run)
 
-        latest = query_repo_commits(identifier)["sha"]
+        latest = query_repo_commits(repo, organization)["sha"]
         if pkg.version == latest:
             print(f"\tdeps.toml is up-to-date")
         else:
@@ -1013,10 +1015,11 @@ def bump():
         print("")
 
 
-def bump_wraps(identifier: str,
+def bump_wraps(organization: str,
+               repo: str,
                packages: Mapping[str, PackageSpec],
                run: Callable):
-    root = query_repo_trees(identifier)
+    root = query_repo_trees(repo, organization)
     subp_dir = next((t for t in root["tree"] if t["path"] == "subprojects"), None)
     if subp_dir is None or subp_dir["type"] != "tree":
         print("\tno wraps to bump")
@@ -1049,7 +1052,7 @@ def bump_wraps(identifier: str,
         source = config["wrap-git"]
 
         url = source["url"]
-        if not url.startswith("https://github.com/frida/"):
+        if try_parse_own_repo_url(url) is None:
             print(f"\tskipping {filename} as URL is external: {url}")
             continue
 
@@ -1065,10 +1068,10 @@ def bump_wraps(identifier: str,
     workdir = detect_cache_dir(ROOT_DIR) / "src"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    sourcedir = workdir / identifier
+    sourcedir = workdir / repo
     if sourcedir.exists():
         shutil.rmtree(sourcedir)
-    run(["git", "clone", "--depth", "1", f"git@github.com:frida/{identifier}.git"], cwd=workdir)
+    run(["git", "clone", "--depth", "1", f"git@github.com:{organization}/{repo}.git"], cwd=workdir)
 
     subpdir = sourcedir / "subprojects"
     revision_pattern = re.compile(r"^(?P<key_equals>\s*revision\s*=\s*)\S+$", re.MULTILINE)
@@ -1092,6 +1095,16 @@ def bump_wraps(identifier: str,
 
 def identifier_from_wrap_filename(filename: str) -> str:
     return filename.split(".", maxsplit=1)[0]
+
+
+def try_parse_own_repo_url(url: str) -> Optional[Tuple[str, str]]:
+    prefix = "https://github.com/"
+    if not url.startswith(prefix):
+        return None
+    organization, repo = url[len(prefix):].removesuffix(".git").split("/")
+    if organization not in OWN_ORGANIZATIONS:
+        return None
+    return (organization, repo)
 
 
 def compute_bundle_parameters(bundle: Bundle,
@@ -1250,6 +1263,8 @@ class CommandError(Exception):
 
 
 DEPS_TOML_PATH = RELENG_DIR / "deps.toml"
+
+OWN_ORGANIZATIONS = {"frida", "frida-forks"}
 
 BUNDLE_URL = "https://build.frida.re/deps/{version}/{filename}"
 BUNDLE_DOWNLOAD_ATTEMPTS = 3
