@@ -228,7 +228,7 @@ url = "https://github.com/frida-forks/sqlite.git"
 [libunwind]
 when = "machine.os in {'linux', 'android', 'freebsd', 'qnx'} and not machine.is_freestanding"
 name = "libunwind"
-version = "733d7d1c73f3512d2a50add2337157fa385a7e6e"
+version = "61860c614cded2a09ff48c8dee569c4179e33697"
 url = "https://github.com/frida-forks/libunwind.git"
 options = [
     "-Dcoredump=disabled",
