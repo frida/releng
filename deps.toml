@@ -284,7 +284,7 @@ dependencies = [
 [libusb]
 when = "machine.os in {'windows', 'macos', 'linux'} and not machine.is_freestanding"
 name = "libusb"
-version = "23d5a2cdc55aa4f0895960d08528e5aa13e7f7e2"
+version = "fb3ed78f899d84638179547ca7517b31ef8cbee5"
 url = "https://github.com/frida-forks/libusb.git"
 options = [
     "-Dexamples=disabled",
