@@ -1,0 +1,50 @@
+#include <stdint.h>
+
+#define FRIDA_BINARY_METADATA @METADATA@
+
+#if defined (_WIN32)
+
+# ifdef _MSC_VER
+#  pragma section (".package", read)
+__declspec (allocate (".package"))
+# else
+__attribute__ ((used, section (".package")))
+# endif
+const char frida_binary_metadata[] = FRIDA_BINARY_METADATA;
+
+# ifdef _MSC_VER
+#  ifdef _M_IX86
+#   pragma comment (linker, "/INCLUDE:_frida_binary_metadata")
+#  else
+#   pragma comment (linker, "/INCLUDE:frida_binary_metadata")
+#  endif
+# endif
+
+#elif defined (__APPLE__)
+
+__attribute__ ((used, section ("__TEXT,__package,regular,no_dead_strip")))
+static const char frida_binary_metadata[] = FRIDA_BINARY_METADATA;
+
+#else
+
+#define FRIDA_NOTE_TYPE_PACKAGE_METADATA 0xcafe1a7e
+#define FRIDA_NOTE_ALIGN(n) (((n) + 3) & ~3)
+
+__attribute__ ((used, aligned (4), section (".note.package")))
+static const struct
+{
+  uint32_t name_size;
+  uint32_t desc_size;
+  uint32_t type;
+  char name[4];
+  char desc[FRIDA_NOTE_ALIGN (sizeof (FRIDA_BINARY_METADATA))];
+} frida_binary_metadata_note =
+{
+  sizeof ("FDO"),
+  sizeof (FRIDA_BINARY_METADATA),
+  FRIDA_NOTE_TYPE_PACKAGE_METADATA,
+  "FDO",
+  FRIDA_BINARY_METADATA,
+};
+
+#endif
