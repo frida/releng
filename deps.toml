@@ -118,7 +118,7 @@ options = [
 
 [glib]
 name = "GLib"
-version = "77d626ecc2445956cf574e9f2b3e099d4e8cfad7"
+version = "c0b58a65f1137fafaf5847fbdd459f1f3a337056"
 url = "https://github.com/frida-forks/glib.git"
 options = [
     "-Dcocoa=disabled",
