@@ -294,7 +294,7 @@ options = [
 [lwip]
 when = "not machine.is_freestanding"
 name = "lwIP"
-version = "a5e8a13894e6911229f59271222b26eb0aaf276f"
+version = "207ac8d6fedfae22698c8ed99b426c089c7e6d18"
 url = "https://github.com/frida-forks/lwip.git"
 options = [
     "-Dipv4=disabled",
